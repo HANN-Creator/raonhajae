@@ -12,6 +12,15 @@ import PlaceDetail from './screens/PlaceDetail';
 import ExpenseAll from './screens/ExpenseAll';
 import ExpenseCapture from './screens/ExpenseCapture';
 import ExpenseSettle from './screens/ExpenseSettle';
+import Site from './web/Site';
+
+// Matches the 760px breakpoint in index.css: wider = website, narrower = mobile app.
+const desktopQuery = window.matchMedia('(min-width: 761px)');
+function useDesktop() {
+  const [d, setD] = useState(desktopQuery.matches);
+  useEffect(() => { const f = () => setD(desktopQuery.matches); desktopQuery.addEventListener('change', f); return () => desktopQuery.removeEventListener('change', f); }, []);
+  return d;
+}
 
 const SCREEN_META: Record<ScreenId, { title: string }> = {
   home: { title: '청도 한바퀴' },
@@ -122,6 +131,8 @@ export default function App() {
     expenseSettle: <ExpenseSettle />,
   };
   const { title } = SCREEN_META[current];
+  const desktop = useDesktop();
+  if (desktop) return <Site current={current} go={go} />;
 
   return (
     <div className="web-app" onClick={onClick}>
