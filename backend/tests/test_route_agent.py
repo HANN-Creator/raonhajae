@@ -87,8 +87,10 @@ class RouteAgentTests(unittest.TestCase):
 
     def test_model_output_is_strict_json(self):
         self.assertEqual(route_agent._parse_agent_choice('{"candidate_id":"1120-1445-full"}'), "1120-1445-full")
+        self.assertEqual(route_agent._parse_agent_choice('```json\n{"candidate_id":"1120-1445-full"}\n```'), "1120-1445-full")
         self.assertIsNone(route_agent._parse_agent_choice('{"candidate_id":"x","fake_time":"12:00"}'))
         self.assertIsNone(route_agent._parse_agent_choice("1120-1445-full"))
+        self.assertIsNone(route_agent._parse_agent_choice('```python\n{"candidate_id":"1120-1445-full"}\n```'))
 
 
 class RouteApiTests(unittest.TestCase):

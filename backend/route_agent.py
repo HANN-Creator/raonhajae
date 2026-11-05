@@ -176,8 +176,14 @@ def _rule_choice(candidates: list[dict], weather_data: dict) -> dict:
 
 
 def _parse_agent_choice(text: str) -> str | None:
+    if not isinstance(text, str):
+        return None
+    content = text.strip()
+    fenced = re.fullmatch(r"```(?:json)?\s*(.*?)\s*```", content, re.IGNORECASE | re.DOTALL)
+    if fenced:
+        content = fenced.group(1)
     try:
-        payload = json.loads(text.strip())
+        payload = json.loads(content)
     except (TypeError, ValueError):
         return None
     if not isinstance(payload, dict) or set(payload) != {"candidate_id"}:
