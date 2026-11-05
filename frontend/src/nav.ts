@@ -1,7 +1,7 @@
 export type ScreenId =
   | 'home' | 'expense' | 'bus' | 'myInput' | 'myResult'
   | 'benefits' | 'benefitDetail' | 'places' | 'placeDetail'
-  | 'expenseAll' | 'expenseCapture' | 'expenseEdit' | 'expenseSettle' | 'map' | 'login' | 'signup'
+  | 'expenseAll' | 'expenseCapture' | 'expenseEdit' | 'expenseSettle' | 'map' | 'login' | 'signup' | 'walk' | 'courseStory' | 'townView'
 
 /** `id` is only used by screens that need one (expenseEdit). */
 export type Go = (s: ScreenId | 'back', id?: string) => void
@@ -14,6 +14,7 @@ export const PATHS: Record<ScreenId, string> = {
   expense: 'expenses', expenseAll: 'expenses-all', expenseCapture: 'expense-new', expenseEdit: 'expense-edit',
   expenseSettle: 'settlement', benefits: 'benefits', benefitDetail: 'benefit-detail',
   places: 'places', placeDetail: 'place-detail', map: 'map', login: 'login', signup: 'signup',
+  walk: 'walk', courseStory: 'course-story', townView: 'town-view',
 }
 // Where "back" goes when the page was opened directly (no history in the app).
 export const PARENT: Partial<Record<ScreenId, ScreenId>> = {

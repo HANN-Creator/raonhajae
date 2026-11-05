@@ -15,6 +15,7 @@ import ExpenseSettle from './screens/ExpenseSettle';
 import Site from './web/Site';
 import MapView from './screens/MapView';
 import { LoginScreen, SignupScreen } from './screens/Account';
+import { CourseStory, TownView, Walk } from './screens/Stories';
 import { AccountPill } from './ui';
 
 // Matches the 760px breakpoint in index.css: wider = website, narrower = mobile app.
@@ -42,6 +43,9 @@ const SCREEN_META: Record<ScreenId, { title: string }> = {
   map: { title: '청도 지도' },
   login: { title: '로그인' },
   signup: { title: '회원가입' },
+  walk: { title: '산책길' },
+  courseStory: { title: '와인터널과 송금마을' },
+  townView: { title: '청도읍 풍경' },
 };
 
 const NAV_ITEMS: { label: string; target: ScreenId; icon: string }[] = [
@@ -54,7 +58,7 @@ const NAV_ITEMS: { label: string; target: ScreenId; icon: string }[] = [
 ];
 
 const MOBILE_NAV_ITEMS: { label: string; target: ScreenId; icon: string; screens: ScreenId[] }[] = [
-  { label: '홈', target: 'home', icon: '⌂', screens: ['home', 'bus'] },
+  { label: '홈', target: 'home', icon: '⌂', screens: ['home', 'bus', 'walk', 'courseStory', 'townView'] },
   { label: '내 코스', target: 'myInput', icon: '↗', screens: ['myInput', 'myResult'] },
   { label: '경비', target: 'expense', icon: '₩', screens: ['expense', 'expenseAll', 'expenseCapture', 'expenseEdit', 'expenseSettle'] },
   { label: '혜택', target: 'benefits', icon: '✳', screens: ['benefits', 'benefitDetail'] },
@@ -117,7 +121,8 @@ export default function App() {
   };
 
   const screens: Record<ScreenId, React.ReactNode> = {
-    home: <><Home go={go} /><AccountPill className="right-[5.05%] top-[1.2%]" /></>,
+    // wrapper: .screen-stage > * is stretched full-size, so the pill must not be a direct child
+    home: <div className="relative"><Home go={go} /><AccountPill className="right-[5.05%] top-[1.2%]" /></div>,
     expense: <Expense go={go} />,
     bus: <Bus />,
     myInput: <MyInput go={go} />,
@@ -133,6 +138,9 @@ export default function App() {
     map: <MapView go={go} />,
     login: <LoginScreen go={go} />,
     signup: <SignupScreen go={go} />,
+    walk: <Walk go={go} />,
+    courseStory: <CourseStory go={go} />,
+    townView: <TownView go={go} />,
   };
   const { title } = SCREEN_META[current];
   const desktop = useDesktop();

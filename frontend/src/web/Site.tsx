@@ -23,7 +23,7 @@ const BUS_URL = 'https://www.cheongdo.go.kr/traffic/contents/01/bus/bus_time.jsp
 const RAILBIKE_URL = 'https://korean.visitkorea.or.kr/dgtourcard/biz/mbrb/mbrbPtcl.do?mbrbId=51c5ee50-3def-4e99-a318-d8f668d385ff';
 
 const NAV: [ScreenId, string, ScreenId[]][] = [
-  ['home', '홈', ['home']],
+  ['home', '홈', ['home', 'walk', 'courseStory', 'townView']],
   ['places', '장소', ['places', 'placeDetail']],
   ['map', '지도', ['map']],
   ['myInput', '코스 만들기', ['myInput', 'myResult']],
@@ -91,7 +91,7 @@ function HomePage({ go, openPlace }: { go: Go; openPlace: (p: Place) => void }) 
       </section>
 
       <section className="mt-12 grid grid-cols-5 gap-4">
-        {([['bus', '버스 코스', '7번 버스 시간표'], ['places', '산책길', '걷기 좋은 곳'], ['benefits', '할인 혜택', '관광주민증'], ['expense', '여행 경비', '함께 정산'], ['places', '청도 장소', '볼거리 · 체험']] as const).map(([to, t, s]) => (
+        {([['bus', '버스 코스', '7번 버스 시간표'], ['walk', '산책길', '걷기 좋은 곳'], ['benefits', '할인 혜택', '관광주민증'], ['expense', '여행 경비', '함께 정산'], ['places', '청도 장소', '볼거리 · 체험']] as const).map(([to, t, s]) => (
           <button key={t} onClick={() => go(to)} className="rounded-2xl border border-[#ece6dd] bg-white p-5 text-left transition hover:-translate-y-0.5 hover:border-[#d9c7b3]">
             <p className="font-bold">{t}</p><p className="mt-1 text-sm text-[#6e6c68]">{s}</p>
           </button>
@@ -102,6 +102,15 @@ function HomePage({ go, openPlace }: { go: Go; openPlace: (p: Place) => void }) 
         <div className="mb-5 flex items-end justify-between">
           <div><p className="text-sm text-[#6e6c68]">언제 도착하든, 내 여행의 속도로</p><h2 className="mt-1 text-2xl font-bold">청도에서 보내는 반나절</h2></div>
           <button onClick={() => go('places')} className="text-sm font-bold text-[#7d3d00]">전체 보기 →</button>
+        </div>
+        <div className="mb-6 grid grid-cols-2 gap-6">
+          {([['courseStory', STORY.course.photo, '7번 버스로 떠나는 코스', '와인터널과 송금마을'], ['townView', STORY.town.photo, '천천히 둘러보기', '청도읍 풍경']] as const).map(([to, img, k, t]) => (
+            <button key={to} onClick={() => go(to)} className="group relative h-64 overflow-hidden rounded-2xl text-left">
+              <img src={img} alt="" className="size-full object-cover transition group-hover:scale-105" />
+              <span className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
+              <span className="absolute bottom-5 left-6 text-white"><span className="block text-sm opacity-90">{k}</span><span className="block text-2xl font-bold">{t}</span></span>
+            </button>
+          ))}
         </div>
         <div className="grid grid-cols-3 gap-6">
           {(data?.places ?? []).slice(0, 3).map(p => <PlaceCard key={p.id} p={p} onOpen={() => openPlace(p)} />)}
@@ -359,12 +368,103 @@ const AuthPage = ({ mode, go }: { mode: 'login' | 'signup'; go: Go }) => (
   </div>
 );
 
+const STORY = {
+  course: { photo: '/assets/a4aec938-4fa3-4a25-82cb-aa0aa330f13d/866bb.png', credit: '사진 Roadgo · Wikimedia Commons' },
+  town: { photo: '/assets/1de36c93-54d2-4d50-8c21-a76f236cac85/37863.png', credit: '사진 한국학중앙연구원 · Wikimedia Commons' },
+};
+
+const Hero = ({ src, alt, credit }: { src: string; alt: string; credit: string }) => (
+  <div className="relative overflow-hidden rounded-3xl">
+    <img src={src} alt={alt} className="h-[360px] w-full object-cover" />
+    <span className="absolute bottom-3 right-4 text-[11px] text-white drop-shadow">{credit}</span>
+  </div>
+);
+const RowLink = ({ title, desc, onClick }: { title: string; desc: string; onClick: () => void }) => (
+  <button onClick={onClick} className="flex w-full items-center justify-between rounded-2xl border border-[#ece6dd] bg-white p-5 text-left hover:border-[#d9c7b3]">
+    <span><span className="block font-bold">{title}</span><span className="block text-sm text-[#6e6c68]">{desc}</span></span>
+    <span className="text-xl text-[#7d3d00]" aria-hidden>→</span>
+  </button>
+);
+
+/** 74:2 산책길 */
+function WalkPage({ go }: { go: Go }) {
+  return (
+    <>
+      <PageHead kicker="WALK" title="와인터널에서 송금마을까지" desc="버스에서 내려 마을 쪽으로 천천히 걸어봐요. · 도보 약 10~15분" />
+      <div className="grid grid-cols-[1.4fr_1fr] gap-8">
+        <div className="space-y-2">
+          <TripMap pins={COURSE_PINS.filter(p => p.id !== 'station')} route={courseRoute().filter(s => s.walk)} className="h-[420px]" />
+          <p className="text-xs text-[#9c978f]">실제 도보길과 진입로는 현장에서 확인해 주세요. · 지도는 위치와 방향을 설명하는 개략 자료입니다.</p>
+        </div>
+        <div className="space-y-3">
+          <h2 className="text-lg font-bold">이 길에서 만나요</h2>
+          <RowLink title="와인터널 · 송금마을" desc="버스 하차 후 이어지는 산책 코스" onClick={() => go('courseStory')} />
+          <RowLink title="청도읍에서 더 둘러보기" desc="방문할 장소를 골라 천천히 돌아봐요" onClick={() => go('townView')} />
+        </div>
+      </div>
+    </>
+  );
+}
+
+/** 69:22 와인터널·송금마을 상세 */
+function CourseStoryPage({ go }: { go: Go }) {
+  const stops = [['청도역 인근', '7번 버스 승차 위치를 확인해요.'], ['와인터널', '남성현(와인터널)에서 내려 둘러봐요.'], ['송금마을', '도보로 산책한 뒤 귀환 버스를 확인해요.']];
+  return (
+    <>
+      <Hero src={STORY.course.photo} alt="와인터널 내부" credit={STORY.course.credit} />
+      <div className="mt-10 grid grid-cols-[1.2fr_1fr] gap-10">
+        <div>
+          <p className="text-xs font-bold tracking-[0.14em] text-[#9e6b3f]">BUS &amp; WALK · 반나절 코스</p>
+          <h1 className="mt-2 text-4xl font-bold leading-tight">7번 버스로 이어지는<br />청도의 반나절</h1>
+          <p className="mt-4 leading-7 text-[#6e6c68]">청도역 인근에서 출발해 와인터널을 둘러보고 송금마을까지 걸어보는 코스예요.<br />도착 시각에 맞는 왕복 버스는 내 코스에서 확인해요.</p>
+          <p className="mt-4 flex gap-5 text-sm font-bold text-[#7d3d00]"><span>🚌 7번 버스</span><button onClick={() => go('walk')}>🚶 도보 이동 →</button></p>
+          <div className="mt-8 flex gap-3"><Btn onClick={() => go('myInput')}>내 코스 만들기</Btn><Btn ghost onClick={() => go('bus')}>버스 동선 보기</Btn></div>
+          <p className="mt-3 text-xs text-[#9c978f]">공개 시간표 기준 · 실시간 운행 정보 아님</p>
+        </div>
+        <Card>
+          <h2 className="text-lg font-bold">이렇게 둘러봐요</h2>
+          <ol className="mt-4 space-y-4">{stops.map(([n, d], i) => (
+            <li key={n} className="flex gap-3"><span className="grid size-8 shrink-0 place-items-center rounded-full bg-[#f7f0e7] text-sm font-bold text-[#7d3d00]">{i + 1}</span>
+              <span><span className="block font-bold">{n}</span><span className="block text-sm text-[#6e6c68]">{d}</span></span></li>
+          ))}</ol>
+          <div className="mt-5"><TripMap pins={COURSE_PINS} route={courseRoute()} className="h-56" /></div>
+        </Card>
+      </div>
+    </>
+  );
+}
+
+/** 69:127 청도읍 풍경 상세 */
+function TownViewPage({ go }: { go: Go }) {
+  return (
+    <>
+      <Hero src={STORY.town.photo} alt="산 사이로 펼쳐진 청도읍 전경" credit={STORY.town.credit} />
+      <div className="mt-10 grid grid-cols-[1.2fr_1fr] gap-10">
+        <div>
+          <p className="text-xs font-bold tracking-[0.14em] text-[#9e6b3f]">SLOW TRAVEL · 청도읍</p>
+          <h1 className="mt-2 text-4xl font-bold leading-tight">청도읍을<br />천천히 바라보는 시간</h1>
+          <p className="mt-4 leading-7 text-[#6e6c68]">산 사이로 펼쳐진 마을의 풍경을 보며 청도 여행을 시작해 보세요.<br />마음에 드는 장소를 골라 천천히 둘러봐요.</p>
+          <p className="mt-5 rounded-xl bg-[#f7f4ef] px-4 py-3 text-xs leading-5 text-[#6e6c68]">이 사진은 청도읍 전경을 담은 자료 사진입니다. 촬영 지점까지의 길 안내는 제공하지 않습니다.</p>
+        </div>
+        <div className="space-y-3">
+          <h2 className="text-lg font-bold">청도읍에서 들를 곳</h2>
+          <RowLink title="청도 레일바이크" desc="청도읍 하지길 46-51 · 체험 및 혜택 확인" onClick={() => go('placeDetail', 'rail-bike')} />
+          <h2 className="pt-4 text-lg font-bold">여행을 이어가요</h2>
+          <RowLink title="청도 장소 둘러보기" desc="볼거리와 체험을 골라보세요" onClick={() => go('places')} />
+          <RowLink title="도착 시각에 맞는 코스 찾기" desc="7번 버스 왕복 동선을 확인해요" onClick={() => go('myInput')} />
+        </div>
+      </div>
+    </>
+  );
+}
+
 /* ---------- shell ---------- */
 export default function Site({ current, id, go }: { current: ScreenId; id?: string; go: Go }) {
   const openPlace = (p: Place) => go('placeDetail', p.id);
   const page: Record<ScreenId, ReactNode> = {
     home: <HomePage go={go} openPlace={openPlace} />,
     map: <MapView go={go} desktop onOpenPlace={openPlace} />,
+    walk: <WalkPage go={go} />, courseStory: <CourseStoryPage go={go} />, townView: <TownViewPage go={go} />,
     login: <AuthPage mode="login" go={go} />, signup: <AuthPage mode="signup" go={go} />,
     places: <PlacesPage openPlace={openPlace} />, placeDetail: <PlaceInfo id={id} go={go} wide />,
     myInput: <CoursePage go={go} />, myResult: <CoursePage go={go} />, bus: <BusPage />,

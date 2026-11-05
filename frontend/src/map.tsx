@@ -79,7 +79,7 @@ export default function TripMap({ pins, route, focus, onSelect, className = 'h-8
     }
     const f = pins.find(p => p.id === focus);
     if (f) m.setView([f.lat, f.lng], 14);
-    else if (pins.length) m.fitBounds(L.latLngBounds(pins.map(p => L.latLng(p.lat, p.lng))), { padding: [40, 40], maxZoom: 14 });
+    else if (pins.length) m.fitBounds(L.latLngBounds(pins.map(p => L.latLng(p.lat, p.lng))), { padding: [40, 40], maxZoom: 16 });
     return () => { layer.remove(); };
   }, [pins, route, focus, onSelect]);
 

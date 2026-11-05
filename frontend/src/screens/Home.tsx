@@ -60,7 +60,7 @@ export default function Home({ go }: ScreenProps) {
       </div>
       <div className="absolute contents inset-[38.93%_8.46%_50.8%_5.3%]">
         <p className="absolute font-['Noto_Sans_KR:Bold'] font-bold inset-[38.93%_59.34%_58.9%_5.3%] leading-[normal] text-[#24211d] text-[16px] whitespace-nowrap">여행 테마별 모아보기</p>
-        <a onClick={() => go('places')} className="absolute contents">
+        <a onClick={() => go('walk')} className="absolute contents">
           <div className="absolute inset-[43.82%_67.25%_53.75%_27.61%]"><div className="absolute inset-[-6.14%_-6.43%]"><img alt="" className="block max-w-none size-full" src={imgThemeWalk} /></div></div>
           <p className="absolute font-['Noto_Sans_KR:Bold'] font-bold inset-[47.72%_66.04%_50.8%_26.14%] leading-[normal] text-[#44413d] text-[11px] text-center whitespace-nowrap">산책길</p>
         </a>
@@ -83,7 +83,7 @@ export default function Home({ go }: ScreenProps) {
       </div>
       <p className="absolute font-['Noto_Sans_KR:Regular'] font-normal inset-[52.05%_58.08%_46.46%_5.3%] leading-[normal] whitespace-nowrap text-[#6e6c68] text-[11px]">언제 도착하든, 내 여행의 속도로</p>
       <p className="absolute font-['Noto_Sans_KR:Bold'] font-bold inset-[54.11%_48.23%_43.26%_5.3%] leading-[normal] whitespace-nowrap text-[#24211d] text-[19px]">청도에서 보내는 반나절</p>
-      <a onClick={() => go('placeDetail')} className="absolute contents">
+      <a onClick={() => go('courseStory')} className="absolute contents">
         <div className="absolute inset-[57.99%_40.4%_27.63%_5.05%] mask-alpha mask-intersect mask-no-clip mask-no-repeat mask-size-[216px_126px]" style={{ maskImage: `url("${imgWineTunnelPhotoReplaceable}")` }}>
           <div className="absolute inset-0 overflow-hidden pointer-events-none"><img alt="" className="absolute left-0 max-w-none size-full top-0 object-cover" src={imgWineTunnelPhotoReplaceable1} /></div>
         </div>
@@ -93,7 +93,7 @@ export default function Home({ go }: ScreenProps) {
         <p className="absolute font-['Noto_Sans_KR:Regular'] font-normal inset-[66.78%_65.4%_31.74%_8.08%] leading-[normal] text-[11px] text-white whitespace-nowrap">7번 버스로 떠나는 코스</p>
         <p className="absolute font-['Noto_Sans_KR:Bold'] font-bold inset-[69.06%_61.62%_29%_8.08%] leading-[normal] text-[14px] text-white whitespace-nowrap">와인터널과 송금마을</p>
       </a>
-      <a onClick={() => go('places')} className="absolute contents">
+      <a onClick={() => go('townView')} className="absolute contents">
         <div className="absolute inset-[57.99%_-7.58%_27.63%_62.63%] mask-alpha mask-intersect mask-no-clip mask-no-repeat mask-size-[178px_126px]" style={{ maskImage: `url("${imgCheongdoTownPhotoReplaceable}")` }}>
           <div className="absolute inset-0 overflow-hidden pointer-events-none"><img alt="" className="absolute left-0 max-w-none size-full top-0 object-cover" src={imgCheongdoTownPhotoReplaceable1} /></div>
         </div>
@@ -104,7 +104,7 @@ export default function Home({ go }: ScreenProps) {
         <p className="absolute font-['Noto_Sans_KR:Bold'] font-bold inset-[69.06%_17.17%_29%_65.66%] leading-[normal] text-[14px] text-white whitespace-nowrap">청도읍 풍경</p>
       </a>
       <p className="absolute font-['Noto_Sans_KR:Bold'] font-bold leading-[normal] whitespace-nowrap inset-[75.23%_66.67%_22.6%_5.3%] text-[#24211d] text-[16px]">오늘의 추천 동선</p>
-      <p role="status" className="absolute font-['Noto_Sans_KR:Regular'] font-normal leading-[normal] whitespace-nowrap inset-[77.7%_auto_20.9%_5.3%] text-[#77736e] text-[10px]">{busLine}</p>
+      <p role="status" className="absolute font-['Noto_Sans_KR:Regular'] font-normal leading-[normal] whitespace-nowrap inset-[82.75%_auto_16.1%_9.34%] z-10 text-[#77736e] text-[9px]">{busLine}</p>
       <a onClick={() => go('bus')} className="absolute font-['Noto_Sans_KR:Bold'] font-bold leading-[normal] whitespace-nowrap inset-[75.68%_5.56%_22.83%_80.05%] text-[#6e6c68] text-[11px] text-right">코스 보기 ↗</a>
       <a onClick={() => go('bus')} className="absolute contents">
         <div className="absolute inset-[78.6%_5.18%_10.56%_5.18%]"><div className="absolute inset-[-0.53%_-0.14%]"><img alt="" className="block max-w-none size-full" src={imgRouteCardSurface} /></div></div>
