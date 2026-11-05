@@ -5,10 +5,6 @@ const imgSariamPhotoReplaceable = `${assetPathPrefix}/510c6.png`;
 const imgWineTunnelPhotoReplaceable1 = `${assetPathPrefix}/8d90d.png`;
 const imgCheongdoTownPhotoReplaceable1 = `${assetPathPrefix}/d5555.png`;
 const img = `${assetPathPrefix}/faa59.svg`;
-const imgDynamicIsland = `${assetPathPrefix}/6cb5d.svg`;
-const imgCellSignal = `${assetPathPrefix}/640c9.svg`;
-const imgWifiSignal = `${assetPathPrefix}/24393.svg`;
-const imgBattery = `${assetPathPrefix}/99143.svg`;
 const imgSearchField = `${assetPathPrefix}/1b45e.svg`;
 const imgSearchIcon = `${assetPathPrefix}/f6e0c.svg`;
 const imgSavedPlaces = `${assetPathPrefix}/a11d7.svg`;
@@ -34,25 +30,17 @@ const imgExpensesTabIcon = `${assetPathPrefix}/51a23.svg`;
 const imgMyRouteTabIcon = `${assetPathPrefix}/9fce1.svg`;
 const imgBenefitsTabIcon = `${assetPathPrefix}/5650c.svg`;
 const imgPlacesTabIcon = `${assetPathPrefix}/7f589.svg`;
-const imgHomeIndicator = `${assetPathPrefix}/10db8.svg`;
 
 export default function Home({ go }: ScreenProps) {
   return (
     <div className="relative size-full">
       <img alt="" className="absolute block inset-0 max-w-none size-full" src={img} />
-      <div className="absolute contents inset-[1.26%_2.84%_95.66%_4.8%]">
-        <p className="absolute font-['Noto_Sans_KR:Bold'] font-bold inset-[2.05%_86.36%_96.12%_4.8%] leading-[normal] text-[#0d0d0d] text-[13px] whitespace-nowrap">10:43</p>
-        <div className="absolute inset-[1.26%_38.64%_95.66%_33.08%]"><img alt="" className="absolute block inset-0 max-w-none size-full" src={imgDynamicIsland} /></div>
-        <div className="absolute inset-[2.34%_13.31%_96.46%_82.83%]"><img alt="" className="absolute block inset-0 max-w-none size-full" src={imgCellSignal} /></div>
-        <div className="absolute inset-[2.32%_7.63%_96.47%_88.64%]"><img alt="" className="absolute block inset-0 max-w-none size-full" src={imgWifiSignal} /></div>
-        <div className="absolute inset-[2.4%_2.84%_96.58%_93.69%]"><div className="absolute inset-[-5.56%_0_-5.56%_-3.64%]"><img alt="" className="block max-w-none size-full" src={imgBattery} /></div></div>
-      </div>
-      <div className="absolute contents inset-[5.59%_5.87%_90.18%_5.05%]">
-        <div className="absolute inset-[5.59%_23.23%_90.18%_5.05%]"><img alt="" className="absolute block inset-0 max-w-none size-full" src={imgSearchField} /></div>
-        <div className="absolute inset-[6.98%_88.25%_91.72%_8.89%]"><div className="absolute inset-[-7.81%]"><img alt="" className="block max-w-none size-full" src={imgSearchIcon} /></div></div>
-        <p className="absolute font-['Noto_Sans_KR:Regular'] font-normal inset-[6.96%_55.05%_91.44%_14.14%] leading-[normal] text-[#66635f] text-[12px] whitespace-nowrap">청도에서 어디로 갈까요?</p>
-        <a onClick={() => go('places')} className="absolute inset-[6.77%_15.47%_91.51%_81.38%]"><div className="absolute inset-[-7.96%_-9.62%]"><img alt="저장한 장소" className="block max-w-none size-full" src={imgSavedPlaces} /></div></a>
-        <a onClick={() => go('myInput')} className="absolute inset-[6.65%_5.87%_91.48%_90.23%]"><div className="absolute inset-[-7.31%_-7.76%]"><img alt="여행 편집" className="block max-w-none size-full" src={imgEditTrip} /></div></a>
+      <div className="absolute contents inset-[2.59%_5.87%_93.18%_5.05%]">
+        <div className="absolute inset-[2.59%_23.23%_93.18%_5.05%]"><img alt="" className="absolute block inset-0 max-w-none size-full" src={imgSearchField} /></div>
+        <div className="absolute inset-[3.98%_88.25%_94.72%_8.89%]"><div className="absolute inset-[-7.81%]"><img alt="" className="block max-w-none size-full" src={imgSearchIcon} /></div></div>
+        <button onClick={() => go('places')} aria-label="청도 장소 검색" className="absolute inset-[3.96%_55.05%_94.44%_14.14%] border-0 bg-transparent p-0 text-left font-['Noto_Sans_KR:Regular'] text-[#66635f] text-[12px] whitespace-nowrap">청도에서 어디로 갈까요?</button>
+        <button onClick={() => go('places')} aria-label="저장한 장소 보기" className="absolute inset-[3.77%_15.47%_94.51%_81.38%] border-0 bg-transparent p-0"><img alt="" className="absolute inset-[-7.96%_-9.62%] size-full" src={imgSavedPlaces} /></button>
+        <button onClick={() => go('myInput')} aria-label="여행 코스 설정" className="absolute inset-[3.65%_5.87%_94.48%_90.23%] border-0 bg-transparent p-0"><img alt="" className="absolute inset-[-7.31%_-7.76%] size-full" src={imgEditTrip} /></button>
       </div>
       <div className="absolute inset-[11.87%_0_63.24%_0] overflow-hidden"><img alt="" className="absolute left-0 max-w-none size-full top-0 object-cover" src={imgSariamPhotoReplaceable} /></div>
       <div className="absolute inset-[11.87%_0_63.24%_0]"><img alt="" className="absolute block inset-0 max-w-none size-full" src={imgPhotoContrastOverlay} /></div>
@@ -120,7 +108,7 @@ export default function Home({ go }: ScreenProps) {
         <p className="absolute font-['Noto_Sans_KR:Bold'] font-bold inset-[86.42%_47.35%_12.1%_42.3%] leading-[normal] text-[#24211d] text-[11px] text-center whitespace-nowrap">와인터널</p>
         <p className="absolute font-['Noto_Sans_KR:Bold'] font-bold inset-[86.42%_13.76%_12.1%_75.88%] leading-[normal] text-[#24211d] text-[11px] text-center whitespace-nowrap">송금마을</p>
       </a>
-      <div className="absolute contents inset-[91.67%_0_0_0]">
+      <div className="absolute contents inset-[91.67%_0_0_0]" data-mock-bottom-nav>
         <div className="absolute inset-[91.67%_0_0_0]"><img alt="" className="absolute block inset-0 max-w-none size-full" src={imgNavigationBackground} /></div>
         <div className="absolute inset-[91.67%_0_8.33%_0]"><div className="absolute inset-[-0.5px_0]"><img alt="" className="block max-w-none size-full" src={imgNavigationDivider} /></div></div>
         <div className="absolute inset-[93.04%_85.1%_4.91%_10.35%]"><div className="absolute inset-[-5.56%]"><img alt="" className="block max-w-none size-full" src={imgHomeTabIcon} /></div></div>
@@ -141,7 +129,6 @@ export default function Home({ go }: ScreenProps) {
           <div className="absolute inset-[92.87%_10.73%_4.91%_85.48%]"><div className="absolute inset-[-5.13%_-6.67%]"><img alt="" className="block max-w-none size-full" src={imgPlacesTabIcon} /></div></div>
           <p className="absolute font-['Noto_Sans_KR:Bold'] font-bold inset-[96%_9.97%_2.51%_84.72%] leading-[normal] text-[#6e6b66] text-[11px] text-center whitespace-nowrap">장소</p>
         </a>
-        <div className="absolute inset-[98.74%_35.1%_0.8%_35.1%]"><img alt="" className="absolute block inset-0 max-w-none size-full" src={imgHomeIndicator} /></div>
       </div>
     </div>
   );

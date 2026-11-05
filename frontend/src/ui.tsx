@@ -12,25 +12,19 @@ export const R = "absolute font-['Noto_Sans_KR:Regular'] font-normal leading-[no
 export const Bg = () => <img alt="" className="absolute block inset-0 max-w-none size-full" src={a('faa59.svg')} />;
 
 export const StatusBar = () => (
-  <>
-    <p className={`${B} inset-[1.6%_83.59%_96.58%_7.58%] text-[#0d0d0d] text-[13px]`}>10:43</p>
-    <I c="inset-[0.8%_35.86%_96.12%_35.86%]" s={a('6cb5d.svg')} />
-    <I c="inset-[1.88%_8.26%_96.92%_87.88%]" s={a('640c9.svg')} />
-    <I c="inset-[1.86%_3.59%_96.93%_92.68%]" s={a('24393.svg')} />
-    <I c="inset-[1.94%_0.06%_97.03%_96.46%]" s={a('99143.svg')} pad="inset-[-5.56%_0_-5.56%_-3.64%]" />
-  </>
+  null
 );
 
 /** Back chevron + page title + divider at y≈10.6% (variant used by most sub-pages). */
 export const Header = ({ title, right, sub }: { title: string; right?: React.ReactNode; sub?: React.ReactNode }) => (
   <>
-    <button className="absolute block cursor-pointer inset-[6.39%_92.42%_91.78%_5.56%]" data-name="Back to home">
+    <button aria-label="이전 화면" className="absolute block cursor-pointer inset-[2.4%_92.42%_95.77%_5.56%]" data-name="Back to home">
       <div className="absolute inset-[-7.5%_-15%]"><img alt="뒤로" className="block max-w-none size-full" src={a('f3d6d.svg')} /></div>
     </button>
-    <p className={`${B} inset-[5.71%_auto_91.32%_14.14%] text-[#24211d] text-[22px]`}>{title}</p>
+    <p className={`${B} inset-[1.72%_auto_95.32%_14.14%] text-[#24211d] text-[22px]`}>{title}</p>
     {right}
     {sub}
-    <I c={sub ? 'inset-[14.38%_0_85.62%_0]' : 'inset-[10.62%_0_89.38%_0]'} s={a('6117b.svg')} pad="inset-[-0.5px_-0.13%]" />
+    <I c={sub ? 'inset-[14.38%_0_85.62%_0]' : 'inset-[7.5%_0_92.5%_0]'} s={a('6117b.svg')} pad="inset-[-0.5px_-0.13%]" />
   </>
 );
 
@@ -45,7 +39,7 @@ const TABS: { id: Tab; label: string; icon: string; on: string; ic: string; pad:
 
 /** activeIcon: screen-specific asset URL for the highlighted tab icon (when it differs from the shared one). */
 export const BottomNav = ({ active, activeIcon }: { active: Tab; activeIcon?: string }) => (
-  <>
+  <div data-mock-bottom-nav className="contents">
     <I c="inset-[91.67%_0_0_0]" s={a('312fb.svg')} />
     <I c="inset-[91.67%_0_8.33%_0]" s={a('6117b.svg')} pad="inset-[-0.5px_-0.13%]" />
     {TABS.map((t, i) => {
@@ -59,6 +53,5 @@ export const BottomNav = ({ active, activeIcon }: { active: Tab; activeIcon?: st
         </div>
       );
     })}
-    <I c="inset-[98.74%_35.1%_0.8%_35.1%]" s={a('10db8.svg')} />
-  </>
+  </div>
 );

@@ -1,9 +1,5 @@
 const assetPathPrefix = "/assets/3420a488-413a-4bef-a126-be092c981cb8";
 const img = `${assetPathPrefix}/faa59.svg`;
-const imgDynamicIsland = `${assetPathPrefix}/6cb5d.svg`;
-const imgCellSignal = `${assetPathPrefix}/640c9.svg`;
-const imgWifiSignal = `${assetPathPrefix}/24393.svg`;
-const imgBattery = `${assetPathPrefix}/99143.svg`;
 const imgBackToHome = `${assetPathPrefix}/f3d6d.svg`;
 const imgHeaderDivider = `${assetPathPrefix}/6117b.svg`;
 const imgSwitchBackground = `${assetPathPrefix}/a33b1.svg`;
@@ -29,27 +25,19 @@ const imgMyRouteTabIcon = `${assetPathPrefix}/9fce1.svg`;
 const imgExpensesTabIcon = `${assetPathPrefix}/f1eab.svg`;
 const imgBenefitsTabIcon = `${assetPathPrefix}/7e949.svg`;
 const imgPlacesTabIcon = `${assetPathPrefix}/7f589.svg`;
-const imgHomeIndicator = `${assetPathPrefix}/10db8.svg`;
 
 export default function Component() {
   return (
     <div className="relative size-full" data-node-id="11:112" data-name="경비 화면 · 편집 가능한 시안">
       <img alt="" className="absolute block inset-0 max-w-none size-full" src={img} />
-      <div className="absolute contents inset-[0.8%_0.06%_96.12%_7.58%]" data-name="01 Status bar">
-        <p className="absolute font-['Noto_Sans_KR:Bold'] font-bold inset-[1.6%_83.59%_96.58%_7.58%] leading-[normal] text-[#0d0d0d] text-[13px] whitespace-nowrap">10:43</p>
-        <div className="absolute inset-[0.8%_35.86%_96.12%_35.86%]"><img alt="" className="absolute block inset-0 max-w-none size-full" src={imgDynamicIsland} /></div>
-        <div className="absolute inset-[1.88%_8.26%_96.92%_87.88%]"><img alt="" className="absolute block inset-0 max-w-none size-full" src={imgCellSignal} /></div>
-        <div className="absolute inset-[1.86%_3.59%_96.93%_92.68%]"><img alt="" className="absolute block inset-0 max-w-none size-full" src={imgWifiSignal} /></div>
-        <div className="absolute inset-[1.94%_0.06%_97.03%_96.46%]"><div className="absolute inset-[-5.56%_0_-5.56%_-3.64%]"><img alt="" className="block max-w-none size-full" src={imgBattery} /></div></div>
-      </div>
-      <div className="absolute contents inset-[5.71%_0_85.62%_0]">
-        <button className="absolute block cursor-pointer inset-[6.39%_92.42%_91.78%_5.56%]" data-name="Back to home">
+      <div className="absolute contents inset-[1.72%_0_89.61%_0]">
+        <button aria-label="이전 화면" className="absolute block cursor-pointer inset-[2.4%_92.42%_95.77%_5.56%]" data-name="Back to home">
           <div className="absolute inset-[-7.5%_-15%]"><img alt="뒤로" className="block max-w-none size-full" src={imgBackToHome} /></div>
         </button>
-        <p className="absolute font-['Noto_Sans_KR:Bold'] font-bold inset-[5.71%_64.14%_91.32%_14.14%] leading-[normal] text-[#24211d] text-[22px] whitespace-nowrap">여행 경비</p>
-        <p className="absolute font-['Noto_Sans_KR:Regular'] font-normal inset-[11.42%_64.14%_86.99%_5.05%] leading-[normal] text-[#6e6c68] text-[12px] whitespace-nowrap">예시 여행 · 청도 1박 2일</p>
-        <p className="absolute font-['Noto_Sans_KR:Regular'] font-normal inset-[11.42%_5.05%_86.99%_80.3%] leading-[normal] text-[#6e6c68] text-[12px] text-right whitespace-nowrap">11월 3–4일</p>
-        <div className="absolute inset-[14.38%_0_85.62%_0]"><div className="absolute inset-[-0.5px_-0.13%]"><img alt="" className="block max-w-none size-full" src={imgHeaderDivider} /></div></div>
+        <p className="absolute font-['Noto_Sans_KR:Bold'] font-bold inset-[1.72%_64.14%_95.32%_14.14%] leading-[normal] text-[#24211d] text-[22px] whitespace-nowrap">여행 경비</p>
+        <p className="absolute font-['Noto_Sans_KR:Regular'] font-normal inset-[8.1%_64.14%_90.31%_5.05%] leading-[normal] text-[#6e6c68] text-[12px] whitespace-nowrap">예시 여행 · 청도 1박 2일</p>
+        <p className="absolute font-['Noto_Sans_KR:Regular'] font-normal inset-[8.1%_5.05%_90.31%_80.3%] leading-[normal] text-[#6e6c68] text-[12px] text-right whitespace-nowrap">11월 3–4일</p>
+        <div className="absolute inset-[12%_0_88%_0]"><div className="absolute inset-[-0.5px_-0.13%]"><img alt="" className="block max-w-none size-full" src={imgHeaderDivider} /></div></div>
       </div>
       <div className="absolute contents inset-[16.32%_5.05%_79.57%_5.05%]">
         <div className="absolute inset-[16.32%_5.05%_79.57%_5.05%]"><img alt="" className="absolute block inset-0 max-w-none size-full" src={imgSwitchBackground} /></div>
@@ -118,7 +106,7 @@ export default function Component() {
         <p className="absolute font-['Noto_Sans_KR:Regular'] font-normal inset-[88.93%_50.25%_9.59%_5.05%] leading-[normal] text-[#6e6c68] text-[11px] whitespace-nowrap">인식한 내용은 저장 전 수정할 수 있어요</p>
         <p className="absolute font-['Noto_Sans_KR:Bold'] font-bold inset-[88.93%_5.05%_9.59%_84.09%] leading-[normal] text-[#7d3d00] text-[11px] text-right whitespace-nowrap">직접 입력</p>
       </a>
-      <div className="absolute contents">
+      <div className="absolute contents" data-mock-bottom-nav>
         <div className="absolute inset-[91.67%_0_0_0]"><img alt="" className="absolute block inset-0 max-w-none size-full" src={imgNavigationBackground} /></div>
         <div className="absolute inset-[91.67%_0_8.33%_0]"><div className="absolute inset-[-0.5px_-0.13%]"><img alt="" className="block max-w-none size-full" src={imgHeaderDivider} /></div></div>
         <a className="absolute contents cursor-pointer" data-name="홈 열기">
@@ -139,7 +127,6 @@ export default function Component() {
           <div className="absolute inset-[92.87%_10.73%_4.91%_85.48%]"><div className="absolute inset-[-5.13%_-6.67%]"><img alt="" className="block max-w-none size-full" src={imgPlacesTabIcon} /></div></div>
           <p className="absolute font-['Noto_Sans_KR:Bold'] font-bold inset-[96%_9.97%_2.51%_84.72%] leading-[normal] text-[#6e6c68] text-[11px] text-center whitespace-nowrap">장소</p>
         </a>
-        <div className="absolute inset-[98.74%_35.1%_0.8%_35.1%]"><img alt="" className="absolute block inset-0 max-w-none size-full" src={imgHomeIndicator} /></div>
       </div>
     </div>
   );

@@ -3,10 +3,6 @@ import { fallbackRecommendation, getBusSchedule, readRecommendation, type BusSch
 
 const assetPathPrefix = "/assets/123f7f76-b1d6-4ccf-931a-fd84185a76e4";
 const img = `${assetPathPrefix}/faa59.svg`;
-const imgDynamicIsland = `${assetPathPrefix}/6cb5d.svg`;
-const imgCellSignal = `${assetPathPrefix}/640c9.svg`;
-const imgWifiSignal = `${assetPathPrefix}/24393.svg`;
-const imgBattery = `${assetPathPrefix}/99143.svg`;
 const imgBackToHome = `${assetPathPrefix}/f3d6d.svg`;
 const imgSaveRouteBookmark = `${assetPathPrefix}/9a43e.svg`;
 const imgHeaderDivider = `${assetPathPrefix}/0b784.svg`;
@@ -50,7 +46,6 @@ const imgMyRouteTabIcon = `${assetPathPrefix}/9fce1.svg`;
 const imgExpensesTabIcon = `${assetPathPrefix}/a30b4.svg`;
 const imgBenefitsTabIcon = `${assetPathPrefix}/7e949.svg`;
 const imgPlacesTabIcon = `${assetPathPrefix}/7f589.svg`;
-const imgHomeIndicator = `${assetPathPrefix}/10db8.svg`;
 
 const I = ({ c, s, pad }: { c: string; s: string; pad?: string }) =>
   pad ? <div className={`absolute ${c}`}><div className={`absolute ${pad}`}><img alt="" className="block max-w-none size-full" src={s} /></div></div>
@@ -85,17 +80,12 @@ export default function Bus() {
   return (
     <div className="relative size-full" data-name="버스 코스 화면">
       <img alt="" className="absolute block inset-0 max-w-none size-full" src={img} />
-      <p className={`${B} inset-[1.6%_83.59%_96.58%_7.58%] text-[#0d0d0d] text-[13px]`}>10:43</p>
-      <I c="inset-[0.8%_35.86%_96.12%_35.86%]" s={imgDynamicIsland} />
-      <I c="inset-[1.88%_8.26%_96.92%_87.88%]" s={imgCellSignal} />
-      <I c="inset-[1.86%_3.59%_96.93%_92.68%]" s={imgWifiSignal} />
-      <I c="inset-[1.94%_0.06%_97.03%_96.46%]" s={imgBattery} pad="inset-[-5.56%_0_-5.56%_-3.64%]" />
-      <button className="absolute block cursor-pointer inset-[6.39%_92.42%_91.78%_5.56%]" data-name="Back to home">
+      <button aria-label="이전 화면" className="absolute block cursor-pointer inset-[2.4%_92.42%_95.77%_5.56%]" data-name="Back to home">
         <div className="absolute inset-[-7.5%_-15%]"><img alt="뒤로" className="block max-w-none size-full" src={imgBackToHome} /></div>
       </button>
-      <p className={`${B} inset-[5.71%_64.14%_91.32%_14.14%] text-[#24211d] text-[22px]`}>버스 코스</p>
+      <p className={`${B} inset-[1.72%_64.14%_95.32%_14.14%] text-[#24211d] text-[22px]`}>버스 코스</p>
       <I c="inset-[6.68%_6.69%_91.53%_90.03%]" s={imgSaveRouteBookmark} pad="inset-[-7.96%_-9.62%]" />
-      <I c="inset-[10.62%_0_89.38%_0]" s={imgHeaderDivider} pad="inset-[-0.5px_-0.13%]" />
+      <I c="inset-[7.5%_0_92.5%_0]" s={imgHeaderDivider} pad="inset-[-0.5px_-0.13%]" />
       <p className={`${B} inset-[12.33%_42.42%_85.05%_5.05%] text-[#24211d] text-[19px]`}>{recommendation.title}</p>
       <p className={`${R} inset-[15.87%_55.3%_82.53%_5.05%] truncate text-[#6e6c68] text-[12px]`}>{routeSummary}</p>
       <I c="inset-[19.18%_92.93%_80.14%_5.56%]" s={imgCourseBusDot} />
@@ -189,6 +179,7 @@ export default function Bus() {
         <I c="inset-[84.59%_5.05%_9.93%_5.05%]" s={imgOfficialTimetableButton} />
         <p className={`${B} inset-[86.53%_30.93%_11.64%_30.93%] text-[13px] text-center text-white`}>청도군 7번 버스 시간표 확인</p>
       </a>
+      <div data-mock-bottom-nav className="contents">
       <I c="inset-[91.67%_0_0_0]" s={imgNavigationBackground} />
       <I c="inset-[91.67%_0_8.33%_0]" s={imgHeaderDivider} pad="inset-[-0.5px_-0.13%]" />
       <a className="absolute contents cursor-pointer" data-name="홈 열기">
@@ -211,7 +202,7 @@ export default function Bus() {
         <I c="inset-[92.87%_10.73%_4.91%_85.48%]" s={imgPlacesTabIcon} pad="inset-[-5.13%_-6.67%]" />
         <p className={`${B} inset-[96%_9.97%_2.51%_84.72%] text-[#6e6c68] text-[11px] text-center`}>장소</p>
       </a>
-      <I c="inset-[98.74%_35.1%_0.8%_35.1%]" s={imgHomeIndicator} />
+      </div>
     </div>
   );
 }
