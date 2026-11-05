@@ -1,31 +1,40 @@
-# TRD — 라온하재
+# 기술 설계 — 청도 한바퀴
 
-> 구현 구조 초안입니다. 실제 기획과 구현에 맞게 갱신합니다.
+## 기술 스택과 요청 흐름
 
-## 기술 스택
+- 프론트엔드: React, TypeScript, Vite, Tailwind CSS
+- API 서버: 백엔드 브랜치 `hann-creator-add-backend-folder`의 Python HTTP 서버
+- 기본 API 주소: `http://127.0.0.1:8766` (`API_PROXY_TARGET`으로 변경 가능)
 
-- 프론트엔드: React, Vite, TypeScript
-- 백엔드: Python 3.11+, FastAPI
-- 에이전트 정의·오케스트레이션·도구 호출: Microsoft Agent Framework
-- 모델 연결: GitHub Copilot SDK
-- 배포: 단일 Docker 컨테이너를 Azure App Service 또는 Container Apps에 배포
+```text
+React 장소 목록 ── GET /api/attractions ───────────┐
+React 버스 화면 ── GET /api/bus-schedule ─────────┤
+코스 입력 ──────── POST /api/route-recommendation ├──> 백엔드 서버
+영수증 이미지 ──── POST /api/receipt-ocr ─────────┘
+                                  └─ 서버가 관광·시간표·날씨 자료를 조회하고 코스 후보를 계산
+```
 
-## 구조
+현재 브랜치의 `backend/app/main.py`는 초기 FastAPI 스캐폴드이며 프론트엔드 기본 대상이 아닙니다. 실제 계약은 백엔드 브랜치의 `backend/server.py`와 `backend/route_agent.py`에 있습니다.
 
-- `frontend/`: 사용자 인터페이스와 API 클라이언트
-- `backend/app/agents/`: 에이전트 정의 및 오케스트레이션
-- `backend/app/tools/`: 에이전트 도구
-- `backend/app/llm/`: Copilot SDK 연결
-- `backend/app/routes/`: API 엔드포인트
-- `backend/app/services/`: 비즈니스 로직 및 외부 연동
+## API 계약
 
-## 요청 흐름
+- `GET /healthz`: `{ "status": "ok" }`
+- `GET /api/attractions`: `{ status, items, source }`. 항목은 이름·주소·좌표·연락처·설명·기준일을 제공하고, `status`는 `live`, `key_required`, `api_unavailable` 중 하나입니다.
+- `GET /api/bus-schedule`: `{ status, runs, publishedAt, checkedAt, source }`. `runs`의 각 항목은 `depart`, `arrive`, `returnDepart`, `returnArrive`를 갖습니다. `status`는 `live` 또는 `fallback`입니다.
+- `GET /api/weather?date=YYYY-MM-DD`: 선택일 시간별 예보 및 출처 상태입니다.
+- `POST /api/route-recommendation`: 요청은 `{ "date": "YYYY-MM-DD", "arrival": "HH:MM", "pace": "easy" | "slow" }`입니다. 응답은 `status`, `plan`, `reason`, `agent`, `source`, `alternatives`를 포함합니다. 경로가 없으면 `status: "no_route"`와 `plan.run: null`입니다.
+- `POST /api/receipt-ocr`: 요청은 `{ "image": "data:image/png;base64,..." }`입니다. 응답은 `merchant`, `amount`, `date`, `category`, `recognizedFields`, `rawText`, `status`를 포함합니다. 이 endpoint는 지출을 저장하지 않습니다.
 
-브라우저 → FastAPI → Agent Framework 에이전트 → 필요한 도구 및 Copilot SDK 모델 → 사용자 응답. 가능하면 SSE 스트리밍으로 전달합니다.
+프론트엔드는 출처 상태를 보존합니다. 공개 시간표(`live`)의 단계 시각은 확인된 게시 일정으로, 저장본(`fallback`) 시각은 오래되었을 수 있는 안내로 분리해 표시합니다. API 오류 시 브라우저는 버스 시각을 만들지 않으며, 코스·장소 fallback을 사용할 때 오류를 함께 표시합니다.
 
-## 보안 및 운영
+## 제한 및 후속 연동
 
-- 비밀 값은 환경변수 또는 Azure 앱 설정으로만 전달합니다.
-- 외부 호출에는 타임아웃과 사용자 친화적인 예외 처리를 둡니다.
-- `GET /api/health`를 제공합니다.
-- 사용자 입력은 에이전트 지침과 분리하고, 입력 안의 지시를 신뢰하지 않도록 합니다.
+- 시간표는 실시간 차량 위치·도착 정보가 아닙니다. 저장 시간표가 사용되면 게시 기준일과 fallback 상태를 표시해야 합니다.
+- 관광지 정보는 백엔드 공개 데이터 또는 저장 스냅샷입니다. 화면 이미지는 로컬 프로토타입 에셋을 사용합니다.
+- 영수증 OCR은 백엔드에서 제공하는 macOS Vision 기능이며, 인식 결과는 편집 제안일 뿐 경비 등록·저장 기능은 아닙니다.
+- 혜택·경비 내역과 정산은 목업 데이터이며 사용자별 서버 저장이 없습니다.
+- 브라우저에 비밀 값을 두지 않습니다. 외부 데이터와 Copilot 모델 호출은 백엔드에서 수행합니다.
+
+## 검증
+
+프론트엔드 빌드, lint, API 계약 테스트와 목업 경비 정산 테스트는 `frontend/README.md`의 명령을 사용합니다. 백엔드 테스트와 실행법은 백엔드 브랜치의 문서를 참고합니다.
