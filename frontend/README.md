@@ -15,6 +15,16 @@ Vite는 기본적으로 `/api` 요청을 `http://127.0.0.1:8766`으로 전달합
 API_PROXY_TARGET=http://localhost:9000 npm run dev
 ```
 
+## Azure 배포
+
+프론트엔드는 Azure Static Web Apps로 배포합니다.
+
+1. Azure Portal에서 **Static Web App** 리소스를 만들고 GitHub 저장소 `HANN-Creator/raonhajae`, 브랜치 `main`을 연결합니다. Build preset은 **Custom**, App location은 `/frontend`, API location은 비워 두고 Output location은 `/dist`로 설정합니다.
+2. Static Web App의 배포 토큰을 복사해 GitHub 저장소의 **Settings → Secrets and variables → Actions → New repository secret**에 `AZURE_STATIC_WEB_APPS_API_TOKEN` 이름으로 저장합니다. Portal이 생성한 워크플로가 있으면 중복 배포를 막기 위해 제거하고 이 저장소의 `.github/workflows/deploy-azure-static-web-app.yml`만 사용합니다.
+3. 저장소의 **Actions**에서 **Deploy frontend to Azure Static Web Apps**를 실행하거나 `main`에 프론트엔드 변경을 push합니다. 성공한 실행의 Azure 도메인에서 사이트를 확인합니다.
+
+워크플로는 테스트와 프로덕션 빌드를 마친 뒤 `frontend/dist`만 Azure에 올립니다. 프론트엔드 API 요청은 기본적으로 같은 도메인의 `/api`를 사용합니다. 별도 백엔드가 준비되어 있으면 저장소의 **Settings → Secrets and variables → Actions → Variables**에 `VITE_API_BASE_URL`을 추가하고 `https://<백엔드-호스트>`를 값으로 설정하세요(끝 `/` 없이). 백엔드는 `/api/attractions`, `/api/bus-schedule`, `/api/route-recommendation`, `/api/weather`, `/api/receipt-ocr` 경로를 제공하고 Azure 프론트엔드 도메인의 CORS 요청을 허용해야 합니다. 이 저장소의 `backend/`는 현재 별도 API 계약과 일치하지 않는 스캐폴드이므로, 해당 API 서버를 별도로 배포하지 않으면 여행 데이터 화면은 내장 예시/대체 데이터로 표시됩니다.
+
 정적 배포 산출물과 목업 경비 정산 테스트:
 
 ```bash

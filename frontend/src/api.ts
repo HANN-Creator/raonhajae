@@ -1,6 +1,8 @@
 export type PlaceCategory = '체험' | '볼거리' | '산책'
 export type DataStatus = 'live' | 'fallback' | 'key_required' | 'api_unavailable' | 'unavailable'
 
+const API_BASE_URL = import.meta.env?.VITE_API_BASE_URL?.replace(/\/+$/, '') ?? ''
+
 export type Place = {
   id: string
   name: string
@@ -335,7 +337,7 @@ function parseReceipt(value: unknown): ReceiptRecognition {
 async function requestJson(path: string, init?: RequestInit, timeoutMs = 8000): Promise<unknown> {
   let response: Response
   try {
-    response = await fetch(path, {
+    response = await fetch(`${API_BASE_URL}${path}`, {
       ...init,
       headers: { Accept: 'application/json', ...init?.headers },
       signal: AbortSignal.timeout(timeoutMs),
