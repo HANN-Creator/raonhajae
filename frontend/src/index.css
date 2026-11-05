@@ -1,0 +1,6 @@
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&display=swap');
+@import "tailwindcss";
+body { margin: 0; background: #e9e6e1; font-family: 'Noto Sans KR', sans-serif; }
+/* Figma emits font-['Noto_Sans_KR:Bold'] — map every variant to the web font */
+[class*="font-['Noto_Sans_KR"] { font-family: 'Noto Sans KR', sans-serif; }
+a { cursor: pointer; }
