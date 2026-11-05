@@ -1,10 +1,10 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { hashPassword, normalizeEmail, validateSignup } from './authCore.ts'
+import { normalizeEmail, readAuthResponse, validateSignup } from './authCore.ts'
 
 const ok = { name: '왕휘도', email: 'me@example.com', password: 'abcd1234', confirm: 'abcd1234' }
 
-test('signup validation', () => {
+test('signup validation matches the backend rules', () => {
   assert.deepEqual(validateSignup(ok), {})
   assert.ok(validateSignup({ ...ok, name: ' ' }).name)
   assert.ok(validateSignup({ ...ok, email: 'nope' }).email)
@@ -14,11 +14,9 @@ test('signup validation', () => {
   assert.equal(normalizeEmail('  Me@Example.COM '), 'me@example.com')
 })
 
-test('password hash depends on password and salt, never stores plaintext', async () => {
-  const salt = new Uint8Array(16).fill(7)
-  const h = await hashPassword('abcd1234', salt)
-  assert.equal(h, await hashPassword('abcd1234', salt))
-  assert.notEqual(h, await hashPassword('abcd1235', salt))
-  assert.notEqual(h, await hashPassword('abcd1234', new Uint8Array(16).fill(8)))
-  assert.ok(!h.includes('abcd1234'))
+test('reads backend auth responses', () => {
+  assert.deepEqual(readAuthResponse(201, { user: { id: 1, email: 'a@b.cd', name: 'A' } }), { user: { id: 1, email: 'a@b.cd', name: 'A' } })
+  assert.deepEqual(readAuthResponse(409, { error: '이미 가입한 이메일이에요.', field: 'email' }), { errors: { email: '이미 가입한 이메일이에요.' } })
+  assert.deepEqual(readAuthResponse(401, { error: '맞지 않아요' }), { errors: { form: '맞지 않아요' } })
+  assert.deepEqual(readAuthResponse(502, null), { errors: { form: '요청에 실패했어요 (502).' } })
 })
