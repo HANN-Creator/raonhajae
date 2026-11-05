@@ -112,6 +112,14 @@ class RouteApiTests(unittest.TestCase):
         connection.close()
         return result
 
+    def post_receipt(self, body):
+        connection = http.client.HTTPConnection("127.0.0.1", self.httpd.server_port, timeout=5)
+        connection.request("POST", "/api/receipt-ocr", body=json.dumps(body), headers={"Content-Type": "application/json"})
+        response = connection.getresponse()
+        result = response.status, json.loads(response.read())
+        connection.close()
+        return result
+
     def test_health_endpoint_is_independent_of_external_services(self):
         connection = http.client.HTTPConnection("127.0.0.1", self.httpd.server_port, timeout=5)
         connection.request("GET", "/healthz")
@@ -127,12 +135,30 @@ class RouteApiTests(unittest.TestCase):
         self.assertEqual(status, 200)
         self.assertEqual(data["plan"]["run"], BUS["runs"][0])
         self.assertEqual(data["agent"]["status"], "disabled")
+        self.assertEqual(data["source"]["status"], "live")
+        self.assertEqual(data["source"]["publishedAt"], BUS["publishedAt"])
+        self.assertEqual(data["source"]["checkedAt"], BUS["checkedAt"])
+        self.assertFalse(data["source"]["realTime"])
 
     def test_invalid_http_input_rejected_before_data_fetch(self):
         with patch("server.bus_schedule") as bus_fetch:
             status, _ = self.post({**CRITERIA, "arrival": "99:99"})
         self.assertEqual(status, 400)
         bus_fetch.assert_not_called()
+
+    def test_date_beyond_one_year_is_rejected_before_data_fetch(self):
+        too_late = (TODAY + timedelta(days=366)).isoformat()
+        with patch("server.bus_schedule") as bus_fetch:
+            status, data = self.post({**CRITERIA, "date": too_late})
+        self.assertEqual(status, 400)
+        self.assertIn("1년 이내", data["error"])
+        bus_fetch.assert_not_called()
+
+    def test_non_macos_receipt_ocr_explains_manual_entry_fallback(self):
+        with patch("server.sys.platform", "linux"):
+            status, data = self.post_receipt({"image": "data:image/png;base64,aGVsbG8="})
+        self.assertEqual(status, 503)
+        self.assertIn("직접 입력", data["error"])
 
 
 if __name__ == "__main__":
