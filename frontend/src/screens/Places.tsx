@@ -74,8 +74,8 @@ export default function Places() {
           {loading
             ? '청도 장소를 불러오는 중…'
             : usingFallback
-              ? `${apiError} 방문 전 최신 정보를 확인하세요.`
-              : `장소 API에서 ${places.length}곳을 불러왔어요.`}
+                ? `${apiError || '저장된 관광지 정보'} · ${places.length}곳`
+                : `공공 관광지 API에서 ${places.length}곳을 불러왔어요.`}
         </p>
 
         <div className="mt-2 flex flex-col gap-3">

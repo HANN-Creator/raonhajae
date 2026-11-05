@@ -13,10 +13,11 @@ const imgWalkNode = `${assetPathPrefix}/2e658.svg`
 const imgRouteDetailButton = `${assetPathPrefix}/69fd9.svg`
 
 const STEP_LAYOUTS = [
-  { y: ['56.85%', '42.01%'], time: ['56.28%', '42.12%'], title: ['56.16%', '42.01%'], detail: ['58.56%', '39.95%'], divider: '61.76%' },
-  { y: ['63.13%', '35.73%'], time: ['62.56%', '35.84%'], title: ['62.44%', '35.73%'], detail: ['64.84%', '33.68%'], divider: '68.04%' },
-  { y: ['69.41%', '29.45%'], time: ['68.84%', '29.57%'], title: ['68.72%', '29.45%'], detail: ['71.12%', '27.4%'], divider: '74.32%' },
-  { y: ['75.68%', '23.17%'], time: ['75.11%', '23.29%'], title: ['75%', '23.17%'], detail: ['77.4%', '21.12%'] },
+  { y: ['56.2%', '42.4%'], time: ['56%', '42.6%'], title: ['56%', '42.6%'], detail: ['57.8%', '40.5%'], divider: '60.5%' },
+  { y: ['61%', '37.6%'], time: ['60.8%', '37.8%'], title: ['60.8%', '37.8%'], detail: ['62.6%', '35.7%'], divider: '65.3%' },
+  { y: ['65.8%', '32.8%'], time: ['65.6%', '33%'], title: ['65.6%', '33%'], detail: ['67.4%', '30.9%'], divider: '70.1%' },
+  { y: ['70.6%', '28%'], time: ['70.4%', '28.2%'], title: ['70.4%', '28.2%'], detail: ['72.2%', '26.1%'], divider: '74.9%' },
+  { y: ['75.4%', '23.2%'], time: ['75.2%', '23.4%'], title: ['75.2%', '23.4%'], detail: ['77%', '21.3%'] },
 ]
 
 function formatDate(value: string) {
@@ -30,9 +31,14 @@ export default function MyResult() {
   const stored = readRecommendation()
   const recommendation = stored?.recommendation ?? fallbackRecommendation
   const stops = recommendation.stops
-  const firstTime = recommendation.scheduleConfirmed ? stops.find((stop) => stop.time)?.time : undefined
-  const lastTime = recommendation.scheduleConfirmed ? [...stops].reverse().find((stop) => stop.time)?.time : undefined
+  const firstTime = stops.find((stop) => stop.time)?.time
+  const lastTime = [...stops].reverse().find((stop) => stop.time)?.time
   const pace = stored?.request.pace === 'slow' ? '여유롭게 둘러보기' : '가볍게 둘러보기'
+  const scheduleLabel = recommendation.scheduleStatus === 'live'
+    ? '확인됨'
+    : recommendation.scheduleStatus === 'fallback'
+      ? '저장본'
+      : '미정'
 
   return (
     <div className="relative size-full">
@@ -58,7 +64,7 @@ export default function MyResult() {
       <p className={`${B} inset-[41.89%_46.97%_55.48%_39.9%] text-[#7d3d00] text-[17px]`}>{lastTime ?? '—'}</p>
       <p className={`${R} inset-[45.55%_49.24%_52.97%_39.9%] text-[#6e6c68] text-[10px]`}>귀환 일정</p>
       <I c="inset-[41.67%_36.62%_52.28%_63.38%]" s={imgOverviewDivider} pad="inset-[-0.94%_-0.5px]" />
-      <p className={`${B} inset-[41.89%_21.46%_55.48%_68.43%] text-[#7d3d00] text-[17px]`}>{recommendation.scheduleConfirmed ? '확정' : '미확정'}</p>
+      <p className={`${B} inset-[41.89%_21.46%_55.48%_68.43%] text-[#7d3d00] text-[17px]`}>{scheduleLabel}</p>
       <p className={`${R} inset-[45.55%_17.42%_52.97%_68.43%] text-[#6e6c68] text-[10px]`}>시간표</p>
       <p className={`${B} inset-[51.48%_79.04%_46.35%_5.05%] text-[#24211d] text-[16px]`}>추천 동선</p>
       <a className={`${B} inset-[52.05%_5.05%_46.46%_72.22%] text-[#7d3d00] text-[11px] text-right cursor-pointer`} data-name="버스 코스 자세히 보기">이동 정보 ↗</a>
@@ -73,7 +79,7 @@ export default function MyResult() {
               <img alt="" className="absolute inset-0 size-full" src={node} />
             </div>
             <p className={`${B} left-[12.37%] right-[79.29%] text-[#7d3d00] text-[11px]`} style={{ top: layout.time[0], bottom: layout.time[1] }}>
-              {recommendation.scheduleConfirmed ? stop.time ?? '—' : '—'}
+              {stop.time ?? '—'}
             </p>
             <p className={`${B} left-[26.77%] text-[#24211d] text-[12px]`} style={{ top: layout.title[0], bottom: layout.title[1] }}>{stop.title}</p>
             <p className={`${R} left-[26.77%] text-[#6e6c68] text-[10px]`} style={{ top: layout.detail[0], bottom: layout.detail[1] }}>{stop.description}</p>
@@ -82,11 +88,15 @@ export default function MyResult() {
         )
       })}
       <p className={`${R} inset-[81.51%_30%_17.01%_5.05%] text-[#6e6c68] text-[10px]`}>
-        {recommendation.scheduleConfirmed
-          ? `서버 확인 시간표${recommendation.scheduleSource ? ` · ${recommendation.scheduleSource}` : ''}`
-          : stored?.usingFallback
-            ? `${stored.error ?? '예시 동선'} · 시간표는 공식 안내에서 확인하세요.`
-            : '예시 동선 · 버스 운행 시간표는 공식 안내에서 확인하세요.'}
+        {stored?.usingFallback && stored.error
+          ? `${stored.error} · 시간표는 공식 안내에서 확인하세요.`
+          : recommendation.status === 'no_route'
+          ? recommendation.reason ?? '선택한 도착 시각에 맞는 왕복편이 없습니다.'
+          : recommendation.scheduleStatus === 'live'
+          ? `청도군 시간표 기준${recommendation.schedulePublishedAt ? ` · ${recommendation.schedulePublishedAt} 기준` : ''}`
+          : recommendation.scheduleStatus === 'fallback'
+            ? `저장 시간표 기준${recommendation.schedulePublishedAt ? ` · ${recommendation.schedulePublishedAt} 기준` : ''} · 방문 전 최신 시간표를 확인하세요.`
+            : '버스 운행 시간표는 공식 안내에서 확인하세요.'}
       </p>
       <a className="absolute contents cursor-pointer" data-name="버스 코스 자세히 보기">
         <I c="inset-[84.59%_5.05%_9.93%_5.05%]" s={imgRouteDetailButton} />
