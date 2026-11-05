@@ -1,0 +1,12 @@
+.git
+**/node_modules
+**/dist
+**/.venv
+**/__pycache__
+**/*.py[cod]
+**/.env
+**/.env.*
+backend/.agent-state
+backend/data
+backend/tests
+frontend/.claude

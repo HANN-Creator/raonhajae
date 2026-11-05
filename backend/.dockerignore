@@ -1,0 +1,11 @@
+.agent-state
+.venv
+.git
+.env
+.env.*
+__pycache__
+tests
+*.py[cod]
+*.pem
+*.key
+data/
