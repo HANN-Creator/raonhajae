@@ -1,69 +1,65 @@
-// Frontend-only accounts: stored in this browser's localStorage, no server.
-// Passwords are never stored: PBKDF2-SHA256 (WebCrypto) with a per-account random salt.
-// ponytail: this keeps accounts apart on one device; it is NOT real authentication (anyone with
-// the device can read/clear localStorage). Move to backend auth before storing anything sensitive.
+// Accounts live on the backend (/api/auth/*): scrypt-hashed passwords, HttpOnly session cookie.
+// The browser never sees the session token; it only knows who is logged in via /api/auth/me.
 import { useEffect, useState } from 'react';
+import { readAuthResponse, validateSignup, type ApiUser } from './authCore';
 import { expenseStore } from './expenses';
 
+export { normalizeEmail, validateSignup } from './authCore';
 export type User = { email: string; name: string };
-type Account = User & { salt: string; hash: string; createdAt: string };
 
-const ACCOUNTS = 'cheongdo.accounts', SESSION = 'cheongdo.session';
-
-import { b64, hashPassword, normalizeEmail, same, unb64, validateSignup } from './authCore';
-export { hashPassword, normalizeEmail, validateSignup };
-
-function readAccounts(): Account[] {
-  try { const v = JSON.parse(localStorage.getItem(ACCOUNTS) ?? '[]'); return Array.isArray(v) ? v : []; } catch { return []; }
-}
-function readSession(): User | null {
-  try {
-    const email = localStorage.getItem(SESSION);
-    const a = email ? readAccounts().find(x => x.email === email) : undefined;
-    return a ? { email: a.email, name: a.name } : null;
-  } catch { return null; }
-}
-
-let user = readSession();
-expenseStore.useOwner(user?.email ?? null);
 const subs = new Set<(u: User | null) => void>();
-function setUser(u: User | null) {
-  user = u;
-  try { if (u) localStorage.setItem(SESSION, u.email); else localStorage.removeItem(SESSION); } catch { /* session just won't persist */ }
-  expenseStore.useOwner(u?.email ?? null);
-  subs.forEach(f => f(u));
+let user: User | null = null;
+let checked = false;
+
+function setUser(u: ApiUser | User | null) {
+  user = u ? { email: u.email, name: u.name } : null;
+  expenseStore.useOwner(user?.email ?? null);
+  subs.forEach(f => f(user));
 }
-if (typeof window !== 'undefined') addEventListener('storage', ev => {
-  if (ev.key === SESSION || ev.key === ACCOUNTS) { user = readSession(); expenseStore.useOwner(user?.email ?? null); subs.forEach(f => f(user)); }
-});
+
+async function call(path: string, body?: unknown) {
+  try {
+    const res = await fetch(`/api/auth/${path}`, {
+      method: body === undefined ? 'GET' : 'POST',
+      headers: body === undefined ? undefined : { 'Content-Type': 'application/json' },
+      body: body === undefined ? undefined : JSON.stringify(body),
+      credentials: 'same-origin',
+      signal: AbortSignal.timeout(10000),
+    });
+    return readAuthResponse(res.status, await res.json().catch(() => null));
+  } catch {
+    return { errors: { form: '서버에 연결할 수 없어요. 잠시 후 다시 시도해 주세요.' } };
+  }
+}
+
+// Remove accounts saved by the old browser-only login (they held password hashes).
+try { localStorage.removeItem('cheongdo.accounts'); localStorage.removeItem('cheongdo.session'); } catch { /* storage blocked */ }
+
+/** Restore the session from the cookie once at startup. */
+export const authReady = (typeof window === 'undefined' ? Promise.resolve() : call('me').then(r => { checked = true; setUser(r.user ?? null); }));
 
 export const auth = {
+  /** Returns field → message errors; empty object on success. */
   async signup(f: { name: string; email: string; password: string; confirm: string }): Promise<Record<string, string>> {
     const err = validateSignup(f);
     if (Object.keys(err).length) return err;
-    const email = normalizeEmail(f.email);
-    const accounts = readAccounts();
-    if (accounts.some(a => a.email === email)) return { email: '이미 가입한 이메일이에요. 로그인해 주세요.' };
-    const salt = crypto.getRandomValues(new Uint8Array(16));
-    const account: Account = { email, name: f.name.trim(), salt: b64(salt), hash: await hashPassword(f.password, salt), createdAt: new Date().toISOString() };
-    try { localStorage.setItem(ACCOUNTS, JSON.stringify([...accounts, account])); }
-    catch { return { form: '이 브라우저에 계정을 저장할 수 없어요. 저장 공간 설정을 확인해 주세요.' }; }
-    setUser({ email, name: account.name });
-    return {};
+    const r = await call('signup', { name: f.name.trim(), email: f.email.trim(), password: f.password });
+    if (r.user) setUser(r.user);
+    return r.errors ?? {};
   },
-  /** Returns '' on success, otherwise a message that doesn't reveal whether the email exists. */
-  async login(emailInput: string, password: string): Promise<string> {
-    const email = normalizeEmail(emailInput);
-    if (!email || !password) return '이메일과 비밀번호를 입력해 주세요.';
-    const a = readAccounts().find(x => x.email === email);
-    // hash even for unknown emails so both paths take the same time
-    const h = await hashPassword(password, a ? unb64(a.salt) : new Uint8Array(16));
-    if (!a || !same(h, a.hash)) return '이메일 또는 비밀번호가 맞지 않아요.';
-    setUser({ email: a.email, name: a.name });
-    return '';
+  /** Returns '' on success, otherwise the message to show. */
+  async login(email: string, password: string): Promise<string> {
+    if (!email.trim() || !password) return '이메일과 비밀번호를 입력해 주세요.';
+    const r = await call('login', { email: email.trim(), password });
+    if (r.user) { setUser(r.user); return ''; }
+    return Object.values(r.errors ?? {})[0] ?? '로그인하지 못했어요.';
   },
-  logout: () => setUser(null),
+  async logout() {
+    await call('logout', {});
+    setUser(null);
+  },
   current: () => user,
+  checked: () => checked,
 };
 
 export function useAuth() {

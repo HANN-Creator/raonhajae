@@ -15,7 +15,7 @@ export function AuthForm({ mode, go }: { mode: 'login' | 'signup'; go: Go }) {
   if (user) return (
     <div className="space-y-4">
       <Alert tone="ok">{user.name}님으로 로그인되어 있어요 · {user.email}</Alert>
-      <p className="text-[13px] text-[#6e6c68]">경비 기록은 계정마다 따로 저장돼요. 이 브라우저에서만 볼 수 있어요.</p>
+      <p className="text-[13px] text-[#6e6c68]">경비 기록은 계정마다 따로 저장돼요. 아직 서버 동기화는 없어서 이 브라우저에서만 볼 수 있어요.</p>
       <div className="flex gap-2">
         <Btn onClick={() => go('home')}>홈으로</Btn>
         <Btn ghost onClick={() => auth.logout()}>로그아웃</Btn>
@@ -54,7 +54,7 @@ export function AuthForm({ mode, go }: { mode: 'login' | 'signup'; go: Go }) {
         {signup ? '이미 계정이 있나요? ' : '처음이신가요? '}
         <button type="button" className="font-bold text-[#7d3d00] underline" onClick={() => go(signup ? 'login' : 'signup')}>{signup ? '로그인' : '회원가입'}</button>
       </p>
-      <p className="text-[11px] leading-5 text-[#9c978f]">계정은 이 브라우저에만 저장돼요. 다른 기기에서는 로그인할 수 없고, 브라우저 데이터를 지우면 계정도 사라져요.</p>
+      <p className="text-[11px] leading-5 text-[#9c978f]">계정은 서버에 저장되고 비밀번호는 암호화돼요. 경비 기록은 아직 이 브라우저에만 저장돼요.</p>
     </form>
   );
 }
