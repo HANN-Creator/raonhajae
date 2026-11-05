@@ -24,7 +24,7 @@ from zoneinfo import ZoneInfo
 import requests
 
 import auth
-from receipt_parser import parse_receipt
+from receipt_parser import category_for, parse_receipt
 from route_agent import RouteInputError, parse_criteria, recommend
 
 
@@ -112,6 +112,75 @@ class Tables(HTMLParser):
             self.depth -= 1
 
 
+class BusRouteTables(HTMLParser):
+    """Extract route tables and their publication dates from the county page."""
+
+    def __init__(self):
+        super().__init__(convert_charrefs=True)
+        self.routes: list[dict] = []
+        self.route: dict | None = None
+        self.table: dict | None = None
+        self.row: list[str] | None = None
+        self.cell: list[str] | None = None
+        self.capture: str | None = None
+        self.capture_text: list[str] = []
+        self.route_depth = 0
+
+    def handle_starttag(self, tag, attrs):
+        attrs = dict(attrs)
+        classes = attrs.get("class", "").split()
+        if tag == "div" and "tab-con" in classes:
+            self.route = {"title": "", "publishedAt": None, "tables": []}
+            self.route_depth = 1
+        elif tag == "div" and self.route is not None:
+            self.route_depth += 1
+        elif tag == "h2" and self.route is not None:
+            self.capture = "title"
+            self.capture_text = []
+        elif tag == "p" and self.route is not None and self.route["publishedAt"] is None:
+            self.capture = "published"
+            self.capture_text = []
+        elif tag == "table" and self.route is not None:
+            self.table = {"summary": attrs.get("summary", ""), "rows": []}
+        elif tag == "tr" and self.table is not None:
+            self.row = []
+        elif tag in {"td", "th"} and self.row is not None:
+            self.cell = []
+
+    def handle_data(self, data):
+        if self.cell is not None:
+            self.cell.append(data)
+        elif self.capture is not None:
+            self.capture_text.append(data)
+
+    def handle_endtag(self, tag):
+        if tag in {"td", "th"} and self.cell is not None and self.row is not None:
+            self.row.append(" ".join(" ".join(self.cell).split()))
+            self.cell = None
+        elif tag == "tr" and self.row is not None and self.table is not None:
+            self.table["rows"].append(self.row)
+            self.row = None
+        elif tag == "table" and self.table is not None and self.route is not None:
+            self.route["tables"].append(self.table)
+            self.table = None
+        elif tag in {"h2", "p"} and self.capture is not None:
+            value = " ".join(" ".join(self.capture_text).split())
+            if self.capture == "title" and self.route is not None:
+                self.route["title"] = value
+            elif self.capture == "published" and self.route is not None:
+                match = re.search(r"(\d{4})\.(\d{1,2})\.\s*현재", value)
+                if match:
+                    self.route["publishedAt"] = f"{match.group(1)}-{int(match.group(2)):02d}"
+            self.capture = None
+            self.capture_text = []
+        elif tag == "div" and self.route is not None:
+            self.route_depth -= 1
+            if self.route_depth == 0:
+                if self.route["title"] and self.route["tables"]:
+                    self.routes.append(self.route)
+                self.route = None
+
+
 def minute_value(value: str) -> int:
     hour, minute = map(int, value.split(":"))
     return hour * 60 + minute
@@ -174,17 +243,54 @@ def parse_bus_schedule(html: str) -> tuple[list[dict[str, str]], str | None]:
     return runs, published_at
 
 
+def parse_bus_routes(html: str) -> list[dict]:
+    parser = BusRouteTables()
+    parser.feed(html)
+    routes = []
+    for route in parser.routes:
+        route_name = route["title"].split("시간표", 1)[0].strip()
+        for table_index, table in enumerate(route["tables"]):
+            direction = table["summary"]
+            rows = table["rows"]
+            if not rows:
+                continue
+            departures = []
+            for row in rows:
+                for cell_index, cell in enumerate(row):
+                    departure = first_time(cell)
+                    if departure:
+                        departures.append({
+                            "depart": departure,
+                            "row": row,
+                            "cellIndex": cell_index,
+                        })
+                        break
+            routes.append({
+                "route": route_name,
+                "title": route["title"],
+                "publishedAt": route["publishedAt"],
+                "direction": direction,
+                "table": table_index + 1,
+                "originCheongdo": bool(re.match(r"^\s*(?:순번\s*)?청도(?:\s|출발|에서|→|-)", direction)),
+                "departures": departures,
+                "rows": rows,
+            })
+    return routes
+
+
 def bus_schedule() -> dict:
     def load():
         try:
             response = requests.get(BUS_URL, timeout=10)
             response.raise_for_status()
             runs, published_at = parse_bus_schedule(response.text)
-            if not runs:
-                raise ValueError("No usable wine tunnel runs in official timetable")
+            routes = parse_bus_routes(response.text)
+            if not routes:
+                raise ValueError("No route tables in official timetable")
             return {
                 "status": "live",
                 "runs": runs,
+                "routes": routes,
                 "publishedAt": published_at,
                 "checkedAt": datetime.now(KST).isoformat(timespec="minutes"),
                 "source": BUS_URL,
@@ -194,12 +300,123 @@ def bus_schedule() -> dict:
             return {
                 "status": "fallback",
                 "runs": FALLBACK_RUNS,
+                "routes": [],
                 "publishedAt": "2025-07",
                 "checkedAt": None,
                 "source": BUS_URL,
             }
 
     return cached("bus", 30 * 60, load)
+
+
+def parse_document_intelligence_result(payload: dict) -> dict:
+    if not isinstance(payload, dict) or not isinstance(payload.get("analyzeResult"), dict):
+        raise ValueError("Invalid Azure receipt result")
+    analysis = payload["analyzeResult"]
+    documents = analysis.get("documents", [])
+    fields = documents[0].get("fields", {}) if isinstance(documents, list) and documents else {}
+    if not isinstance(fields, dict):
+        fields = {}
+
+    def field_value(*names):
+        for name in names:
+            field = fields.get(name, {})
+            if not isinstance(field, dict):
+                continue
+            for key in ("valueString", "valueDate", "valueNumber"):
+                if field.get(key) is not None:
+                    return field[key]
+            currency = field.get("valueCurrency")
+            if isinstance(currency, dict) and currency.get("amount") is not None:
+                return currency
+        return None
+
+    content = analysis.get("content", "")
+    if not isinstance(content, str):
+        content = ""
+    lines = [line.strip() for line in content.splitlines() if line.strip()]
+    parsed = parse_receipt([{"text": line} for line in lines])
+    merchant = field_value("MerchantName", "Merchant")
+    transaction_date = field_value("TransactionDate", "TransactionTime")
+    total = field_value("Total", "TotalAmount", "AmountDue")
+    currency_code = None
+    amount = None
+    if isinstance(total, dict):
+        currency_code = total.get("currencyCode")
+        currency_amount = total.get("amount")
+        if currency_amount is not None and currency_code in (None, "KRW"):
+            amount = round(float(currency_amount))
+    elif total is not None:
+        try:
+            amount = round(float(total))
+        except (TypeError, ValueError):
+            amount = None
+    if transaction_date:
+        try:
+            transaction_date = date.fromisoformat(str(transaction_date)[:10]).isoformat()
+        except ValueError:
+            transaction_date = parsed["date"]
+    merchant_text = str(merchant).strip()[:80] if merchant else parsed["merchant"]
+    return {
+        **parsed,
+        "merchant": merchant_text,
+        "amount": amount if amount is not None else (
+            None if currency_code not in (None, "KRW") else parsed["amount"]
+        ),
+        "date": transaction_date or parsed["date"],
+        "category": category_for(merchant_text, lines),
+        "recognizedFields": [
+            field for field, value in (
+                ("merchant", merchant or parsed["merchant"]),
+                ("amount", amount if amount is not None else (
+                    None if currency_code not in (None, "KRW") else parsed["amount"]
+                )),
+                ("date", transaction_date or parsed["date"]),
+            ) if value is not None and value != ""
+        ],
+        "currencyCode": currency_code,
+        "rawText": content[:4000],
+        "provider": "azure_document_intelligence",
+    }
+
+
+def azure_receipt_ocr(image: bytes, content_type: str) -> dict:
+    endpoint = os.environ.get("AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT", "").strip().rstrip("/")
+    key = os.environ.get("AZURE_DOCUMENT_INTELLIGENCE_KEY", "").strip()
+    if not endpoint or not key:
+        raise RuntimeError("Azure Document Intelligence is not configured")
+    if not re.match(r"^https://[^/]+$", endpoint):
+        raise ValueError("Invalid Azure Document Intelligence endpoint")
+    analyze_url = f"{endpoint}/documentintelligence/documentModels/prebuilt-receipt:analyze"
+    response = requests.post(
+        analyze_url,
+        params={"api-version": "2024-11-30"},
+        headers={"Ocp-Apim-Subscription-Key": key, "Content-Type": content_type},
+        data=image,
+        timeout=20,
+    )
+    response.raise_for_status()
+    if response.status_code == 200:
+        return parse_document_intelligence_result(response.json())
+    operation_url = response.headers.get("Operation-Location")
+    if not operation_url or not operation_url.startswith(endpoint + "/"):
+        raise ValueError("Azure receipt analysis did not provide a valid operation URL")
+    deadline = time.monotonic() + 40
+    while time.monotonic() < deadline:
+        time.sleep(1)
+        operation = requests.get(
+            operation_url,
+            headers={"Ocp-Apim-Subscription-Key": key},
+            timeout=10,
+        )
+        operation.raise_for_status()
+        result = operation.json()
+        status = result.get("status")
+        if status == "succeeded":
+            return parse_document_intelligence_result(result)
+        if status in {"failed", "canceled"}:
+            raise ValueError("Azure receipt analysis failed")
+    raise TimeoutError("Azure receipt analysis timed out")
 
 
 def weather(travel_date: str) -> dict:
@@ -251,7 +468,12 @@ def weather(travel_date: str) -> dict:
 
 
 def api_items(payload: dict) -> list[dict]:
-    body = payload.get("response", {}).get("body", {})
+    response = payload.get("response", payload)
+    if not isinstance(response, dict):
+        return []
+    body = response.get("body", {})
+    if not isinstance(body, dict):
+        return []
     items = body.get("items", [])
     if isinstance(items, dict):
         items = items.get("item", [])
@@ -267,43 +489,70 @@ def attractions() -> dict:
 
     def load():
         try:
-            live_items = []
-            for name in ("와인터널", "청도레일바이크"):
+            page_number = 1
+            page_size = 1000
+            records = []
+            total_count = None
+            while total_count is None or len(records) < total_count:
                 response = requests.get(
                     ATTRACTION_URL,
                     params={
                         "serviceKey": unquote(key),
-                        "pageNo": 1,
-                        "numOfRows": 20,
+                        "pageNo": page_number,
+                        "numOfRows": page_size,
                         "type": "json",
-                        "trrsrtNm": name,
                     },
                     timeout=10,
                 )
                 response.raise_for_status()
-                candidates = api_items(response.json())
-                match = next(
-                    (
-                        item
-                        for item in candidates
-                        if item.get("trrsrtNm") == name and "청도군" in item.get("rdnmadr", "")
-                    ),
-                    None,
-                )
-                if not match:
-                    raise ValueError(f"No Cheongdo record for {name}")
+                payload = response.json()
+                envelope = payload.get("response", payload) if isinstance(payload, dict) else {}
+                header = envelope.get("header", {}) if isinstance(envelope, dict) else {}
+                result_code = header.get("resultCode")
+                if result_code not in (None, "00", "0000"):
+                    raise ValueError(f"Attraction API error ({result_code})")
+                body = envelope.get("body", {}) if isinstance(envelope, dict) else {}
+                if not isinstance(body, dict):
+                    raise ValueError("Invalid attraction API response")
+                if total_count is None:
+                    total_count_value = body.get("totalCount")
+                    total_count = int(total_count_value) if total_count_value is not None else None
+                page_items = api_items(payload)
+                records.extend(page_items)
+                if len(page_items) < page_size or not page_items:
+                    break
+                page_number += 1
+            live_items = []
+            seen = set()
+            for item in records:
+                if not isinstance(item, dict):
+                    continue
+                address = str(item.get("rdnmadr") or item.get("lnmadr") or "")
+                if "청도군" not in address and item.get("signguNm") != "청도군":
+                    continue
+                name = str(item.get("trrsrtNm") or "").strip()
+                if not name or (name, address) in seen:
+                    continue
+                seen.add((name, address))
                 live_items.append(
                     {
-                        "name": match.get("trrsrtNm", ""),
-                        "address": match.get("rdnmadr", ""),
-                        "latitude": match.get("latitude"),
-                        "longitude": match.get("longitude"),
-                        "phone": match.get("phoneNumber", ""),
-                        "referenceDate": match.get("referenceDate", ""),
-                        "description": match.get("trrsrtIntrcn", ""),
+                        "name": name,
+                        "address": address,
+                        "latitude": item.get("latitude"),
+                        "longitude": item.get("longitude"),
+                        "phone": item.get("phoneNumber", ""),
+                        "referenceDate": item.get("referenceDate", ""),
+                        "description": item.get("trrsrtIntrcn", ""),
                     }
                 )
-            return {"status": "live", "items": live_items, "source": ATTRACTION_SOURCE}
+            if not live_items:
+                raise ValueError("No Cheongdo attractions in public data response")
+            return {
+                "status": "live",
+                "items": live_items,
+                "checkedAt": datetime.now(KST).isoformat(timespec="minutes"),
+                "source": ATTRACTION_SOURCE,
+            }
         except (requests.RequestException, ValueError, TypeError, json.JSONDecodeError) as error:
             logger.warning("Attraction data fallback used (%s)", type(error).__name__)
             return {"status": "api_unavailable", "items": ATTRACTION_SNAPSHOT, "source": ATTRACTION_SOURCE}
@@ -320,7 +569,12 @@ class Handler(SimpleHTTPRequestHandler):
         if parsed.path == "/healthz":
             return self.send_json({"status": "ok"})
         if parsed.path == "/api/bus-schedule":
-            return self.send_json(bus_schedule())
+            schedule = bus_schedule()
+            return self.send_json({
+                **schedule,
+                "scope": "all published city-bus timetable tables",
+                "realTime": False,
+            })
         if parsed.path == "/api/attractions":
             return self.send_json(attractions())
         if parsed.path == "/api/auth/me":
@@ -347,7 +601,12 @@ class Handler(SimpleHTTPRequestHandler):
                 criteria = parse_criteria(payload)
             except (ValueError, TypeError) as error:
                 return self.send_json({"error": str(error) if isinstance(error, RouteInputError) else "여행 조건을 확인해 주세요."}, 400)
-            result = recommend(criteria, bus_schedule(), weather(criteria["date"]))
+            result = recommend(
+                criteria,
+                bus_schedule(),
+                weather(criteria["date"]),
+                attraction_data=attractions(),
+            )
             logger.info(
                 "Route recommendation completed (engine=%s, status=%s)",
                 result["agent"]["engine"],
@@ -375,9 +634,35 @@ class Handler(SimpleHTTPRequestHandler):
         except (ValueError, TypeError, AttributeError, binascii.Error):
             return self.send_json({"error": "사진을 읽지 못했습니다. 다른 파일로 다시 시도해 주세요."}, 400)
 
+        image_type = match.group(1)
+        mime_type = "image/jpeg" if image_type == "jpeg" else f"image/{image_type}"
+        azure_configured = bool(
+            os.environ.get("AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT", "").strip()
+            and os.environ.get("AZURE_DOCUMENT_INTELLIGENCE_KEY", "").strip()
+        )
+        azure_consent = payload.get("azureConsent") is True
+        if azure_configured and azure_consent:
+            try:
+                parsed = azure_receipt_ocr(image, mime_type)
+                parsed["status"] = "recognized" if parsed["recognizedFields"] else "no_text"
+                parsed["privacyNotice"] = "영수증 이미지가 Azure AI Document Intelligence로 전송되어 분석됩니다."
+                return self.send_json(parsed)
+            except (requests.RequestException, TimeoutError) as error:
+                logger.warning("Azure receipt recognition unavailable (%s)", type(error).__name__)
+                return self.send_json({"error": "Azure 영수증 인식에 연결하지 못했습니다. 다시 시도하거나 직접 입력해 주세요."}, 503)
+            except (ValueError, TypeError, json.JSONDecodeError) as error:
+                logger.warning("Azure receipt recognition failed (%s)", type(error).__name__)
+                return self.send_json({"error": "Azure가 영수증을 읽지 못했습니다. 직접 입력해 주세요."}, 422)
+        if azure_configured and not azure_consent and sys.platform != "darwin":
+            return self.send_json({
+                "error": "Azure OCR로 사진을 보내려면 명시적 동의가 필요합니다. 직접 입력하거나 동의 후 다시 시도해 주세요.",
+                "provider": "azure_document_intelligence",
+                "requiresAzureConsent": True,
+                "privacyNotice": "영수증 이미지와 인식 내용이 Azure AI Document Intelligence로 전송됩니다.",
+            }, 428)
         if sys.platform != "darwin":
-            return self.send_json({"error": "이 서버에서 사진 인식을 사용할 수 없습니다. 직접 입력해 주세요."}, 503)
-        suffix = ".jpg" if match.group(1) == "jpeg" else f".{match.group(1)}"
+            return self.send_json({"error": "Azure OCR 설정이 없고 이 서버에서는 macOS Vision을 사용할 수 없습니다. 직접 입력해 주세요."}, 503)
+        suffix = ".jpg" if image_type == "jpeg" else f".{image_type}"
         temporary_path = None
         try:
             with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as temporary:
@@ -394,6 +679,7 @@ class Handler(SimpleHTTPRequestHandler):
                 raise ValueError("Unexpected recognition result")
             parsed = parse_receipt(observations)
             parsed["status"] = "recognized" if parsed["rawText"] else "no_text"
+            parsed["provider"] = "apple_vision"
             return self.send_json(parsed)
         except (subprocess.TimeoutExpired, OSError, ValueError, json.JSONDecodeError):
             return self.send_json({"error": "사진 인식이 지연되었습니다. 다시 시도하거나 직접 입력해 주세요."}, 503)
