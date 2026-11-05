@@ -8,3 +8,4 @@ tests
 *.py[cod]
 *.pem
 *.key
+data/

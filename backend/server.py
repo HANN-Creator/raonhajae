@@ -15,6 +15,7 @@ import threading
 import time
 from datetime import date, datetime, timedelta
 from html.parser import HTMLParser
+from http.cookies import CookieError, SimpleCookie
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, unquote, urlparse
@@ -22,6 +23,7 @@ from zoneinfo import ZoneInfo
 
 import requests
 
+import auth
 from receipt_parser import parse_receipt
 from route_agent import RouteInputError, parse_criteria, recommend
 
@@ -321,6 +323,9 @@ class Handler(SimpleHTTPRequestHandler):
             return self.send_json(bus_schedule())
         if parsed.path == "/api/attractions":
             return self.send_json(attractions())
+        if parsed.path == "/api/auth/me":
+            user = auth.current_user(self.session_token())
+            return self.send_json({"user": user} if user else {"error": "로그인이 필요해요."}, 200 if user else 401)
         if parsed.path == "/api/weather":
             travel_date = parse_qs(parsed.query).get("date", [""])[0]
             return self.send_json(weather(travel_date))
@@ -328,6 +333,8 @@ class Handler(SimpleHTTPRequestHandler):
 
     def do_POST(self):
         endpoint = urlparse(self.path).path
+        if endpoint.startswith("/api/auth/"):
+            return self.handle_auth(endpoint)
         if endpoint == "/api/route-recommendation":
             length_header = self.headers.get("Content-Length", "")
             if not length_header.isdigit() or int(length_header) > 4096:
@@ -394,11 +401,52 @@ class Handler(SimpleHTTPRequestHandler):
             if temporary_path:
                 Path(temporary_path).unlink(missing_ok=True)
 
-    def send_json(self, payload, status=200):
+    def session_token(self) -> str | None:
+        try:
+            morsel = SimpleCookie(self.headers.get("Cookie", "")).get(auth.SESSION_COOKIE)
+        except CookieError:
+            return None
+        return morsel.value if morsel else None
+
+    def handle_auth(self, endpoint: str):
+        # JSON-only + SameSite=Lax cookie: a cross-site HTML form can't send application/json, which blocks CSRF.
+        if not self.headers.get("Content-Type", "").startswith("application/json"):
+            return self.send_json({"error": "JSON 요청만 받을 수 있어요."}, 415)
+        length_header = self.headers.get("Content-Length", "0")
+        if not length_header.isdigit() or int(length_header) > 4096:
+            return self.send_json({"error": "요청을 확인해 주세요."}, 400)
+        try:
+            payload = json.loads(self.rfile.read(int(length_header)) or b"{}")
+            if not isinstance(payload, dict):
+                raise ValueError
+        except ValueError:
+            return self.send_json({"error": "요청을 확인해 주세요."}, 400)
+        secure = os.environ.get("COOKIE_SECURE") == "1"
+        try:
+            if endpoint == "/api/auth/signup":
+                user, token = auth.signup(payload)
+                logger.info("Account created (id=%s)", user["id"])
+                return self.send_json({"user": user}, 201, {"Set-Cookie": auth.session_cookie(token, secure)})
+            if endpoint == "/api/auth/login":
+                user, token = auth.login(payload, client=self.client_address[0])
+                return self.send_json({"user": user}, 200, {"Set-Cookie": auth.session_cookie(token, secure)})
+            if endpoint == "/api/auth/logout":
+                auth.logout(self.session_token())
+                return self.send_json({"ok": True}, 200, {"Set-Cookie": auth.clear_cookie(secure)})
+        except auth.AuthError as error:
+            body = {"error": str(error)}
+            if error.field:
+                body["field"] = error.field
+            return self.send_json(body, error.status)
+        return self.send_json({"error": "지원하지 않는 요청입니다."}, 404)
+
+    def send_json(self, payload, status=200, headers: dict[str, str] | None = None):
         content = json.dumps(payload, ensure_ascii=False).encode("utf-8")
         self.send_response(status)
         self.send_header("Content-Type", "application/json; charset=utf-8")
         self.send_header("Cache-Control", "no-store")
+        for key, value in (headers or {}).items():
+            self.send_header(key, value)
         self.send_header("Content-Length", str(len(content)))
         self.end_headers()
         self.wfile.write(content)

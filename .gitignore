@@ -5,3 +5,4 @@
 __pycache__/
 *.py[cod]
 backend/.agent-state/
+backend/data/
