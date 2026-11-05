@@ -7,20 +7,21 @@ React 내 코스 입력
   → POST /api/route-recommendation (server.py)
   → 청도군 공개 시간표 + Open-Meteo 예보 조회
   → route_agent.py: 입력 검증 → 가능한 일정 최대 8개 계산
-  → Microsoft Agent Framework GitHubCopilotAgent
-      → GitHub Copilot SDK CopilotClient (empty mode, 도구 없음)
-      → 후보 ID 1개 선택
+  → Microsoft Agent Framework GitHubCopilotAgent 코디네이터
+      → 날씨/시간표 전문 에이전트로 제어 핸드오프
+      → GitHub Copilot SDK CopilotClient (empty mode, 내장 도구 없음)
+      → 전문 에이전트가 후보 ID 1개 선택
   → 후보 ID 검증 → 일정/출처/에이전트 상태 JSON
   → React 추천 코스 화면
 ```
 
-`GitHubCopilotAgent`는 Microsoft Agent Framework의 GitHub Copilot 연동이며 내부에서 GitHub Copilot SDK를 사용한다. 이 프로젝트는 SDK의 `CopilotClient`도 직접 구성하여 `mode="empty"`와 별도 상태 디렉터리를 지정한다. 참고: [Agent Framework 연동 구현](https://github.com/microsoft/agent-framework/blob/main/python/packages/github_copilot/agent_framework_github_copilot/_agent.py), [GitHub Copilot SDK Python](https://github.com/github/copilot-sdk/blob/main/python/README.md).
+`GitHubCopilotAgent`는 Microsoft Agent Framework의 GitHub Copilot 연동이며 내부에서 GitHub Copilot SDK를 사용한다. 코디네이터는 허용된 전문 역할을 JSON으로 반환하고, 애플리케이션이 해당 전문 에이전트로 실행 제어를 넘긴다. 전문 에이전트의 후보 ID만 서버에서 검증하여 채택한다. 이 connector의 `GitHubCopilotAgent`는 Agent Framework `HandoffBuilder`가 요구하는 core `Agent` 타입과 다르므로, SDK/Agent Framework connector를 유지하는 명시적 역할 핸드오프를 사용한다. SDK 클라이언트는 `mode="empty"`와 별도 상태 디렉터리로 구성한다. 참고: [Agent Framework 연동 구현](https://github.com/microsoft/agent-framework/blob/main/python/packages/github_copilot/agent_framework_github_copilot/_agent.py), [GitHub Copilot SDK Python](https://github.com/github/copilot-sdk/blob/main/python/README.md).
 
 ## 2. 주요 파일
 
 | 파일 | 역할 |
 | --- | --- |
-| `route_agent.py` | 조건 검증, 시간표 기반 후보 생성, Copilot 선택, 결과 검증, 규칙 대체 추천 |
+| `route_agent.py` | 조건 검증, 후보 생성, 코디네이터→전문 에이전트 핸드오프, 후보 검증, 규칙 대체 추천 |
 | `server.py` | HTTP API, 시간표/날씨 캐시와 데이터 수집 |
 | `frontend/src/App.jsx` | 추천 API 요청 및 상태 관리 |
 | `frontend/src/Explore.jsx` | 로딩·추천 결과·추천 방식 표시 |
@@ -57,7 +58,7 @@ React 내 코스 입력
     "durationMinutes": 225
   },
   "reason": "청도 도착 후 30분 여유를 두고 7번 버스를 탈 수 있어요.",
-  "agent": {"engine":"copilot","status":"used"},
+  "agent": {"engine":"copilot","status":"used","specialist":"weather"},
   "source": {"url":"https://www.cheongdo.go.kr/traffic/contents/01/bus/bus_time.jsp","status":"live","publishedAt":"2026-10","checkedAt":"2026-11-05T10:00+09:00","realTime":false},
   "alternatives": []
 }
@@ -71,9 +72,9 @@ React 내 코스 입력
 
 - 시간표: `server.py`에서 청도군 페이지를 30분 캐시한다. 조회 실패 시 저장된 2025-07 시간표를 `fallback`으로 표시한다.
 - 날씨: 선택일이 예보 범위 안이면 Open-Meteo를 20분 캐시한다. 없거나 실패하면 날씨 정보 없이 추천한다.
-- 후보: 시간 형식과 순서를 검사하고, 도착 후 최소 20분, 귀환 전 이동 여유를 확인한다. 모델은 후보 ID만 반환한다.
+- 후보: 시간 형식과 순서를 검사하고, 도착 후 최소 20분, 귀환 전 이동 여유를 확인한다. 코디네이터는 허용 전문 역할을, 전문 에이전트는 후보 ID만 반환한다.
 - 추천 설명은 선택된 후보의 검증된 수치로 서버가 작성한다. 모델의 자유 문장은 화면에 그대로 노출하지 않는다.
-- `available_tools=[]`, Copilot SDK `mode="empty"`, Agent Framework의 기본 권한 거부를 사용한다. 에이전트에 파일·셸·웹·MCP 도구를 제공하지 않는다.
+- Copilot SDK `mode="empty"`, `available_tools=[]`로 내장 파일·셸·웹·MCP 도구를 제공하지 않는다. 역할 핸드오프는 애플리케이션이 허용된 두 전문 에이전트 중 하나만 호출한다.
 - React는 같은 조건으로 추천 코스 화면을 다시 여는 경우 결과를 5분 동안 재사용하여 모델 중복 호출을 줄인다.
 
 ## 5. 실행과 배포

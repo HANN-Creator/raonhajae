@@ -92,6 +92,43 @@ class RouteAgentTests(unittest.TestCase):
         self.assertIsNone(route_agent._parse_agent_choice("1120-1445-full"))
         self.assertIsNone(route_agent._parse_agent_choice('```python\n{"candidate_id":"1120-1445-full"}\n```'))
 
+    def test_coordinator_handoff_is_limited_to_available_specialists(self):
+        self.assertEqual(
+            route_agent._parse_specialist_choice('{"specialist":"weather"}', {"weather", "timetable"}),
+            "weather",
+        )
+        self.assertEqual(
+            route_agent._parse_specialist_choice('```json\n{"specialist":"timetable"}\n```', {"timetable"}),
+            "timetable",
+        )
+        self.assertIsNone(route_agent._parse_specialist_choice('{"specialist":"weather"}', {"timetable"}))
+        self.assertIsNone(route_agent._parse_specialist_choice('{"specialist":"shell"}', {"weather", "timetable"}))
+        self.assertIsNone(route_agent._parse_specialist_choice('{"specialist":"weather","candidate_id":"x"}', {"weather"}))
+
+    def test_selected_handoff_specialist_is_reported(self):
+        result = route_agent.recommend(
+            CRITERIA,
+            BUS,
+            {},
+            selector=lambda _criteria, candidates, _weather: route_agent.AgentSelection(
+                candidates[-1]["id"], "timetable",
+            ),
+            today=TODAY,
+        )
+        self.assertEqual(result["agent"], {"engine": "copilot", "status": "used", "specialist": "timetable"})
+
+    def test_invalid_handoff_specialist_falls_back(self):
+        result = route_agent.recommend(
+            CRITERIA,
+            BUS,
+            {},
+            selector=lambda _criteria, candidates, _weather: route_agent.AgentSelection(
+                candidates[-1]["id"], "unknown",
+            ),
+            today=TODAY,
+        )
+        self.assertEqual(result["agent"], {"engine": "rules", "status": "invalid_output"})
+
 
 class RouteApiTests(unittest.TestCase):
     @classmethod

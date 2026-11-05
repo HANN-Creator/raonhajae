@@ -28,7 +28,7 @@ Linux 컨테이너 배포 절차와 공개 노출 시 주의사항은 [`DEPLOYME
 - `POST /api/route-recommendation`: JSON `{"date":"YYYY-MM-DD","arrival":"10:50","pace":"easy"}`
 - `POST /api/receipt-ocr`: JSON `{"image":"data:image/png;base64,..."}`; macOS Vision 필요
 
-길 추천 응답의 `agent.engine`이 `copilot`이면 실제 모델이 유효한 코스 후보를 선택한 것입니다. `rules`이면 검증된 시간표 기반 대체 추천입니다. 버스 시간표는 실시간 운행 정보가 아닙니다.
+길 추천 응답의 `agent.engine`이 `copilot`이면 코디네이터가 전문 에이전트로 핸드오프했고, 해당 에이전트가 유효한 코스 후보를 선택한 것입니다. `agent.specialist`는 `weather` 또는 `timetable`로 실제 선택 역할을 나타냅니다. `rules`이면 검증된 시간표 기반 대체 추천입니다. 버스 시간표는 실시간 운행 정보가 아닙니다.
 
 추천 요청은 한국 시간 기준 오늘부터 1년 이내의 날짜만 받으며, 잘못된 조건은 외부 조회 전에 `400`으로 거절합니다. 성공 응답에는 `plan`, `reason`, `agent`, `source`가 포함되고, 가능한 왕복편이 없으면 `status: "no_route"`와 `plan.run: null`을 반환합니다. `source.status`는 시간표가 `live` 조회인지 `fallback` 저장본인지 나타내며, 실시간 운행 정보가 아님을 `source.realTime: false`로 명시합니다. 비 macOS 서버에서 영수증 OCR은 `503`과 직접 입력 안내를 반환합니다.
 
