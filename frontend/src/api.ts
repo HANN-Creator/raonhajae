@@ -41,7 +41,18 @@ export type Recommendation = {
   run?: BusRun | null
   reason?: string
   stops: RouteStop[]
+  /** 'copilot' only when the model picked a validated candidate; otherwise rule-based. */
+  engine?: 'copilot' | 'rules'
+  agentStatus?: string
+  durationMinutes?: number
+  waitingMinutes?: number
+  alternatives?: RouteAlternative[]
 }
+
+export type RouteAlternative = { id: string; title: string; depart: string; returnArrive: string }
+
+export type WeatherHour = { time: string; temperature: number; rainChance: number; code: number }
+export type Weather = { status: string; date: string; hours: WeatherHour[]; source?: string }
 
 export type BusRun = {
   depart: string
@@ -211,7 +222,26 @@ function parseRecommendation(value: unknown): Recommendation {
     run,
     reason,
     stops,
+    ...parseExtras(value, plan),
   }
+}
+
+const num = (v: unknown) => typeof v === 'number' && Number.isFinite(v) && v >= 0 ? v : undefined
+
+function parseExtras(value: Record<string, unknown>, plan: Record<string, unknown>) {
+  const agent = isRecord(value.agent) ? value.agent : {}
+  const alternatives = Array.isArray(value.alternatives)
+    ? value.alternatives.filter((a): a is RouteAlternative => isRecord(a) && typeof a.id === 'string' &&
+      typeof a.title === 'string' && typeof a.depart === 'string' && typeof a.returnArrive === 'string')
+      .map(({ id, title, depart, returnArrive }) => ({ id, title, depart, returnArrive }))
+    : undefined
+  return {
+    engine: agent.engine === 'copilot' || agent.engine === 'rules' ? agent.engine : undefined,
+    agentStatus: typeof agent.status === 'string' ? agent.status : undefined,
+    durationMinutes: num(plan.durationMinutes),
+    waitingMinutes: num(plan.waitingMinutes),
+    alternatives,
+  } satisfies Partial<Recommendation>
 }
 
 function parseRun(value: unknown): BusRun {
@@ -279,6 +309,7 @@ function parseStoredRecommendation(value: unknown): Recommendation {
     run: value.run === null ? null : value.run === undefined ? undefined : parseRun(value.run),
     reason: typeof value.reason === 'string' ? value.reason : undefined,
     stops,
+    ...parseExtras({ agent: { engine: value.engine, status: value.agentStatus }, alternatives: value.alternatives }, value),
   }
 }
 
@@ -301,13 +332,22 @@ function parseReceipt(value: unknown): ReceiptRecognition {
   }
 }
 
-async function requestJson(path: string, init?: RequestInit): Promise<unknown> {
-  const response = await fetch(path, {
-    ...init,
-    headers: { Accept: 'application/json', ...init?.headers },
-    signal: AbortSignal.timeout(8000),
+async function requestJson(path: string, init?: RequestInit, timeoutMs = 8000): Promise<unknown> {
+  let response: Response
+  try {
+    response = await fetch(path, {
+      ...init,
+      headers: { Accept: 'application/json', ...init?.headers },
+      signal: AbortSignal.timeout(timeoutMs),
+    })
+  } catch (error) {
+    throw new Error(error instanceof DOMException && error.name === 'TimeoutError'
+      ? '서버 응답이 너무 오래 걸려요.'
+      : '서버에 연결할 수 없어요. 인터넷 연결을 확인해 주세요.')
+  }
+  const payload: unknown = await response.json().catch(() => {
+    throw new Error(`서버 응답을 읽지 못했어요 (${response.status}).`)
   })
-  const payload: unknown = await response.json()
   if (!response.ok) {
     const message = isRecord(payload) && typeof payload.error === 'string'
       ? payload.error
@@ -367,7 +407,39 @@ export async function getBusSchedule(): Promise<{
   }
 }
 
+/** Today in Korea (YYYY-MM-DD), independent of the device timezone. */
+export const kstToday = (offsetDays = 0) => new Date(Date.now() + 9 * 3600_000 + offsetDays * 86400_000).toISOString().slice(0, 10)
+/** Backend accepts dates from today up to 365 days ahead (route_agent.parse_criteria). */
+export const tripDateRange = () => ({ min: kstToday(), max: kstToday(365) })
+
+export function validateTrip(input: TripRequest): string {
+  const { min, max } = tripDateRange()
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(input.visitDate)) return '여행 날짜를 선택해 주세요.'
+  if (input.visitDate < min || input.visitDate > max) return '오늘부터 1년 이내의 여행 날짜를 선택해 주세요.'
+  if (!TIME_PATTERN.test(input.arrivalTime)) return '청도 도착 시각을 HH:MM 형식으로 입력해 주세요.'
+  return ''
+}
+
+// Same conditions within 5 minutes reuse the last successful answer (spec §4).
+const RECOMMENDATION_TTL = 5 * 60_000
+// The Copilot route agent can take ~20s (backend ROUTE_AGENT_TIMEOUT) before the rules fallback answers.
+const ROUTE_TIMEOUT_MS = 45_000
+const recommendationCache = new Map<string, { at: number; value: Awaited<ReturnType<typeof requestRecommendation>> }>()
+
 export async function createRecommendation(input: TripRequest): Promise<{
+  recommendation: Recommendation
+  usingFallback: boolean
+  error?: string
+}> {
+  const key = JSON.stringify([input.visitDate, input.arrivalTime, input.pace])
+  const hit = recommendationCache.get(key)
+  if (hit && Date.now() - hit.at < RECOMMENDATION_TTL) return hit.value
+  const value = await requestRecommendation(input)
+  if (!value.error) recommendationCache.set(key, { at: Date.now(), value })
+  return value
+}
+
+async function requestRecommendation(input: TripRequest): Promise<{
   recommendation: Recommendation
   usingFallback: boolean
   error?: string
@@ -381,7 +453,7 @@ export async function createRecommendation(input: TripRequest): Promise<{
         arrival: input.arrivalTime,
         pace: input.pace,
       }),
-    })
+    }, ROUTE_TIMEOUT_MS)
     const recommendation = parseRecommendation(response)
     return {
       recommendation,
@@ -393,6 +465,18 @@ export async function createRecommendation(input: TripRequest): Promise<{
       usingFallback: true,
       error: error instanceof Error ? error.message : '코스 API에 연결할 수 없어 예시 동선을 보여드립니다.',
     }
+  }
+}
+
+export async function getWeather(date: string): Promise<Weather | null> {
+  try {
+    const v = await requestJson(`/api/weather?date=${encodeURIComponent(date)}`)
+    if (!isRecord(v) || v.status !== 'live' || !Array.isArray(v.hours)) return null
+    const hours = v.hours.filter((h): h is WeatherHour => isRecord(h) && typeof h.time === 'string' &&
+      typeof h.temperature === 'number' && typeof h.rainChance === 'number' && typeof h.code === 'number')
+    return { status: v.status, date, hours, source: typeof v.source === 'string' ? v.source : undefined }
+  } catch {
+    return null
   }
 }
 

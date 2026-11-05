@@ -1,14 +1,7 @@
-import type { Expense } from './settle';
+export const CATEGORIES = ['항공', '숙박', '식비', '쇼핑', '교통', '체험', '기타'] as const;
+export type Category = (typeof CATEGORIES)[number];
 
-// Sample trip from the Figma design (11/3–4, 나 · 민지)
-export const EXPENSES: (Expense & { name: string; cat: string; date: string })[] = [
-  { name: '와인터널 입장', cat: '기타', date: '11월 4일', amount: 11000, payer: '나', shared: true },
-  { name: '청도반시 구매', cat: '쇼핑', date: '11월 4일', amount: 23000, payer: '나', shared: false },
-  { name: '청도 시내버스', cat: '교통', date: '11월 4일', amount: 11000, payer: '민지', shared: true },
-  { name: '청도 숙소', cat: '숙박', date: '11월 3일', amount: 125000, payer: '나', shared: true },
-  { name: '청도 식당', cat: '식비', date: '11월 3일', amount: 46000, payer: '나', shared: true },
-  { name: '카페', cat: '식비', date: '11월 3일', amount: 27000, payer: '민지', shared: true },
-  { name: '택시', cat: '교통', date: '11월 3일', amount: 18000, payer: '나', shared: true },
-];
-export const PEOPLE = ['나', '민지'];
-export const won = (n: number) => `₩${n.toLocaleString('ko-KR')}`;
+/** Everyone starts with just themselves; companions are added on the settlement screen. */
+export const DEFAULT_PEOPLE = ['나'];
+export const won = (n: number) => `₩${Math.round(n).toLocaleString('ko-KR')}`;
+export const dayLabel = (iso: string) => { const [, m, d] = iso.split('-').map(Number); return m && d ? `${m}월 ${d}일` : iso; };

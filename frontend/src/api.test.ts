@@ -170,7 +170,7 @@ test('round-trips the normalized route through session storage', async () => {
     },
   })
   try {
-    const request = { visitDate: '2026-11-07', arrivalTime: '10:50', pace: 'easy' as const }
+    const request = { visitDate: '2026-11-07', arrivalTime: '10:55', pace: 'easy' as const }
     const result = await createRecommendation(request)
     saveRecommendation(result.recommendation, request, result.usingFallback)
     const stored = readRecommendation()
@@ -230,5 +230,28 @@ test('surfaces backend errors instead of parsing them as successful payloads', a
     )
   } finally {
     fetchMock.restore()
+  }
+})
+
+test('reuses an identical successful recommendation for 5 minutes', async () => {
+  let calls = 0
+  const originalFetch = globalThis.fetch
+  globalThis.fetch = (async () => {
+    calls++
+    return new Response(JSON.stringify({
+      status: 'ok',
+      plan: { title: '캐시 확인', date: '2026-12-01', arrival: '09:00', run: null, steps: [{ time: '09:00', title: '청도 도착', detail: '이동', kind: 'start' }] },
+      agent: { engine: 'rules', status: 'disabled' }, source: { status: 'live' }, alternatives: [],
+    }), { status: 200, headers: { 'Content-Type': 'application/json' } })
+  }) as typeof fetch
+  try {
+    const req = { visitDate: '2026-12-01', arrivalTime: '09:00', pace: 'slow' as const }
+    await createRecommendation(req)
+    await createRecommendation(req)
+    assert.equal(calls, 1)
+    await createRecommendation({ ...req, pace: 'easy' })
+    assert.equal(calls, 2)
+  } finally {
+    globalThis.fetch = originalFetch
   }
 })

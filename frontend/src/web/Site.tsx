@@ -1,32 +1,37 @@
 // Desktop website: normal flow layout (not the scaled Figma phone frames), same API and routing.
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import {
-  createRecommendation, fallbackRecommendation, getBusSchedule, getPlaces, readRecommendation,
-  recognizeReceipt, saveRecommendation, type BusSchedule, type Place, type PlaceCategory, type TripRequest,
+  createRecommendation, fallbackRecommendation, getBusSchedule, getPlaces, readRecommendation, tripDateRange, validateTrip,
+  saveRecommendation, type BusSchedule, type Place, type PlaceCategory, type TripRequest,
 } from '../api';
-import { EXPENSES, PEOPLE, won } from '../data';
-import { settle } from '../settle';
+import { COURSE_PINS, CourseResult, type StoredResult } from '../courseUi';
+import { BENEFITS, BENEFITS_URL, BenefitList, checkedLabel } from '../benefits';
+import { PlaceInfo } from '../screens/PlaceDetail';
+import { AuthForm } from '../screens/Account';
+import { auth, useAuth } from '../auth';
+
+import { won } from '../data';
+import { useExpenses } from '../expenses';
+import { Breakdown, ExpenseForm, ExpenseList, SettlementPanel, StorageNote, useSettlement } from '../expenseUi';
 import type { Go, ScreenId } from '../nav';
+import TripMap, { courseRoute, visitsVillage, placePins } from '../map';
+import MapView from '../screens/MapView';
+
 
 const HERO = '/assets/63074331-c5ab-4c65-8481-c6e91566771a/8d90d.png';
 const BUS_URL = 'https://www.cheongdo.go.kr/traffic/contents/01/bus/bus_time.jsp';
-const BENEFITS_URL = 'https://korean.visitkorea.or.kr/dgtourcard/biz/regn/regnMain.do?mtpcDoCd=47&signguCd=47820';
 const RAILBIKE_URL = 'https://korean.visitkorea.or.kr/dgtourcard/biz/mbrb/mbrbPtcl.do?mbrbId=51c5ee50-3def-4e99-a318-d8f668d385ff';
 
 const NAV: [ScreenId, string, ScreenId[]][] = [
   ['home', '홈', ['home']],
   ['places', '장소', ['places', 'placeDetail']],
+  ['map', '지도', ['map']],
   ['myInput', '코스 만들기', ['myInput', 'myResult']],
   ['bus', '버스', ['bus']],
   ['benefits', '혜택', ['benefits', 'benefitDetail']],
-  ['expense', '경비', ['expense', 'expenseAll', 'expenseCapture', 'expenseSettle']],
+  ['expense', '경비', ['expense', 'expenseAll', 'expenseCapture', 'expenseEdit', 'expenseSettle']],
 ];
 
-const BENEFITS = [
-  { id: 'railbike', cat: '체험', name: '청도 레일바이크', deal: '탑승권 20% 할인', how: '현장 QR 발급 후 직원 확인', detail: true },
-  { id: 'comedy', cat: '관람', name: '한국코미디타운', deal: '입장 1천원 · 공연 5천원 할인', how: '디지털 관광주민증 제시' },
-  { id: 'ogamz', cat: '식음료', name: '오감즈카페', deal: '음료 10% 할인', how: '디지털 관광주민증 제시' },
-];
 
 /* ---------- shared bits ---------- */
 const Btn = ({ children, onClick, ghost, type = 'button', disabled }: { children: ReactNode; onClick?: () => void; ghost?: boolean; type?: 'button' | 'submit'; disabled?: boolean }) => (
@@ -59,6 +64,14 @@ function usePlaces() {
 }
 
 /* ---------- pages ---------- */
+function BusStatus() {
+  const [b, setB] = useState<{ schedule: BusSchedule | null; error?: string } | null>(null);
+  useEffect(() => { let on = true; getBusSchedule().then(r => on && setB(r)); return () => { on = false; }; }, []);
+  return <p role="status" className="mt-1 text-xs text-[#77736e]">{!b ? '버스 시간표 확인 중…' : b.schedule
+    ? `${b.schedule.status === 'live' ? '청도군 게시 시간표' : '저장된 시간표'}${b.schedule.publishedAt ? `(${b.schedule.publishedAt})` : ''} · ${b.schedule.runs.map(r => r.depart).join(' · ') || '운행편 없음'} 출발 · 실시간 아님`
+    : '시간표를 불러오지 못했어요 · 원문에서 확인해 주세요'}</p>;
+}
+
 function HomePage({ go, openPlace }: { go: Go; openPlace: (p: Place) => void }) {
   const data = usePlaces();
   return (
@@ -102,6 +115,7 @@ function HomePage({ go, openPlace }: { go: Go; openPlace: (p: Place) => void }) 
             <p className="text-sm text-[#6e6c68]">오늘의 추천 동선 · 7번 버스 + 도보</p>
             <h2 className="mt-1 text-xl font-bold">와인터널 · 송금마을 반나절</h2>
             <p className="mt-3 text-sm text-[#24211d]">청도역 → 와인터널 → 송금마을</p>
+            <BusStatus />
           </div>
           <div className="flex gap-3"><Btn ghost onClick={() => go('bus')}>버스 보기</Btn><Btn onClick={() => go('myInput')}>내 시간에 맞추기</Btn></div>
         </Card>
@@ -138,6 +152,8 @@ function PlacesPage({ openPlace }: { openPlace: (p: Place) => void }) {
         ))}
       </div>
       {data?.error && <div className="mb-6"><Notice>{data.error}</Notice></div>}
+      {!!list.length && <div className="mb-6"><TripMap pins={placePins(list)} className="h-72"
+        onSelect={id => { const p = list.find(x => x.id === id); if (p) openPlace(p); }} /></div>}
       <div className="grid grid-cols-3 gap-6">
         {!data && [0, 1, 2].map(i => <div key={i} className="h-72 animate-pulse rounded-2xl bg-[#f1ede7]" />)}
         {list.map(p => <PlaceCard key={p.id} p={p} onOpen={() => openPlace(p)} />)}
@@ -148,50 +164,39 @@ function PlacesPage({ openPlace }: { openPlace: (p: Place) => void }) {
   );
 }
 
-function PlaceDetailPage({ place, go }: { place: Place | null; go: Go }) {
-  if (!place) return <Notice>장소를 먼저 선택해 주세요.</Notice>;
-  return (
-    <div className="grid grid-cols-[1.3fr_1fr] gap-10">
-      <img src={place.imageUrl} alt={place.name} className="h-[460px] w-full rounded-3xl object-cover" />
-      <div>
-        <p className="text-sm font-bold text-[#9e6b3f]">{place.category} · {place.area}</p>
-        <h1 className="mt-2 text-4xl font-bold">{place.name}</h1>
-        <p className="mt-3 text-[#6e6c68]">{place.description}</p>
-        <dl className="mt-8 grid grid-cols-[80px_1fr] gap-y-3 border-y border-[#ece6dd] py-6 text-sm">
-          <dt className="text-[#6e6c68]">주소</dt><dd className="font-bold">{place.address ?? place.area}</dd>
-          {place.phone && <><dt className="text-[#6e6c68]">문의</dt><dd><a href={`tel:${place.phone}`} className="font-bold">{place.phone}</a></dd></>}
-        </dl>
-        <p className="mt-4 text-xs text-[#9c978f]">운영시간과 입장료는 방문 전 현장에서 확인</p>
-        <div className="mt-8 flex gap-3"><Btn onClick={() => go('myInput')}>내 코스에 넣기</Btn><Btn ghost onClick={() => go('bus')}>가는 버스 보기</Btn></div>
-      </div>
-    </div>
-  );
-}
-
-function CoursePage() {
+function CoursePage({ go }: { go: Go }) {
   const stored = readRecommendation();
-  const [req, setReq] = useState<TripRequest>(stored?.request ?? { visitDate: '2026-11-07', arrivalTime: '10:50', pace: 'easy' });
-  const [result, setResult] = useState(stored);
+  const range = tripDateRange();
+  const [req, setReq] = useState<TripRequest>(() => {
+    const r = stored?.request;
+    return r && r.visitDate >= range.min && r.visitDate <= range.max ? r : { visitDate: range.min, arrivalTime: '10:50', pace: 'easy' };
+  });
+  const [result, setResult] = useState<StoredResult | null>(stored);
   const [busy, setBusy] = useState(false);
+  const [invalid, setInvalid] = useState('');
   const submit = async () => {
+    const err = validateTrip(req);
+    setInvalid(err);
+    if (err || busy) return;
     setBusy(true);
     const r = await createRecommendation(req);
     saveRecommendation(r.recommendation, req, r.usingFallback, r.error);
     setResult({ ...r, request: req });
     setBusy(false);
   };
-  const rec = result?.recommendation;
+  const focusForm = () => document.getElementById('arrival-time')?.focus();
   return (
     <>
       <PageHead kicker="MY COURSE" title="내 시간에 맞는 코스" desc="도착 시간에 맞는 여행 동선을 찾아드려요." />
       <div className="grid grid-cols-[380px_1fr] gap-8">
         <Card>
-          <form onSubmit={e => { e.preventDefault(); submit(); }} className="space-y-6">
+          <form onSubmit={e => { e.preventDefault(); submit(); }} className="space-y-6" noValidate>
             <label className="block text-sm font-bold">여행 날짜
-              <input type="date" required value={req.visitDate} onChange={e => setReq({ ...req, visitDate: e.target.value })} className="mt-2 h-11 w-full rounded-xl border border-[#e3dcd2] px-3 font-normal" />
+              <input type="date" required min={range.min} max={range.max} value={req.visitDate} onChange={e => setReq({ ...req, visitDate: e.target.value })} className="mt-2 h-11 w-full rounded-xl border border-[#e3dcd2] px-3 font-normal" />
+              <span className="mt-1 block text-xs font-normal text-[#6e6c68]">오늘부터 1년 이내 · 한국 시간 기준</span>
             </label>
             <label className="block text-sm font-bold">청도 도착 시각
-              <input type="time" required value={req.arrivalTime} onChange={e => setReq({ ...req, arrivalTime: e.target.value })} className="mt-2 h-11 w-full rounded-xl border border-[#e3dcd2] px-3 font-normal" />
+              <input id="arrival-time" type="time" required value={req.arrivalTime} onChange={e => setReq({ ...req, arrivalTime: e.target.value })} className="mt-2 h-11 w-full rounded-xl border border-[#e3dcd2] px-3 font-normal" />
               <span className="mt-1 block text-xs font-normal text-[#6e6c68]">승차 위치로 이동할 여유 20분 이상을 더해요.</span>
             </label>
             <fieldset><legend className="text-sm font-bold">여행 속도</legend>
@@ -199,37 +204,20 @@ function CoursePage() {
                 {([['easy', '가볍게 둘러보기', '핵심 장소를 차례로'], ['slow', '여유롭게 둘러보기', '한 장소에서 더 오래']] as const).map(([v, t, s]) => (
                   <button type="button" key={v} onClick={() => setReq({ ...req, pace: v })} aria-pressed={req.pace === v}
                     className={`rounded-xl border p-3 text-left ${req.pace === v ? 'border-[#7d3d00] bg-[#f7f0e7]' : 'border-[#e3dcd2]'}`}>
-                    <p className="text-sm font-bold">{t}</p><p className="text-xs text-[#6e6c68]">{s}</p>
+                    <p className="text-sm font-bold">{req.pace === v ? '✓ ' : ''}{t}</p><p className="text-xs text-[#6e6c68]">{s}</p>
                   </button>
                 ))}
               </div>
             </fieldset>
-            <Btn type="submit" disabled={busy}>{busy ? '코스 찾는 중…' : '내 시간에 맞는 코스 보기'}</Btn>
+            {invalid && <Notice tone="error">{invalid}</Notice>}
+            <Btn type="submit" disabled={busy}>{busy ? 'AI가 코스를 고르는 중… (최대 30초)' : '내 시간에 맞는 코스 보기'}</Btn>
             <p className="text-xs text-[#9c978f]">청도군 공개 시간표 기준 · 실시간 도착정보 아님</p>
           </form>
         </Card>
         <Card>
-          {!rec && <p className="py-20 text-center text-[#6e6c68]">왼쪽에서 조건을 고르고 코스를 찾아보세요</p>}
-          {rec && <>
-            {result?.error && <div className="mb-4"><Notice tone="error">{result.error}</Notice></div>}
-            {result?.usingFallback && !result.error && <div className="mb-4"><Notice>저장된 시간표로 계산했어요.</Notice></div>}
-            {rec.status === 'ok' && <p className="text-xs font-bold text-[#9e6b3f]">AI 추천 결과{rec.scheduleSource ? ` · ${rec.scheduleSource}` : ''}</p>}
-            <h2 className="mt-1 text-2xl font-bold">{rec.title}</h2>
-            <p className="mt-2 text-sm text-[#6e6c68]">{rec.summary}</p>
-            {rec.run && <div className="mt-5 grid grid-cols-2 gap-3 text-sm">
-              <div className="rounded-xl bg-[#f7f4ef] p-4"><p className="text-[#6e6c68]">첫 일정</p><p className="mt-1 font-bold">{rec.run.depart} 출발 → {rec.run.arrive} 도착</p></div>
-              <div className="rounded-xl bg-[#f7f4ef] p-4"><p className="text-[#6e6c68]">귀환 일정</p><p className="mt-1 font-bold">{rec.run.returnDepart} 출발 → {rec.run.returnArrive} 도착</p></div>
-            </div>}
-            <ol className="mt-6 space-y-0">
-              {rec.stops.map((s, i) => (
-                <li key={i} className="flex gap-4 border-l-2 border-[#ead9c6] pb-5 pl-5 last:pb-0">
-                  <span className="w-14 shrink-0 text-sm font-bold text-[#7d3d00]">{s.time ?? ''}</span>
-                  <div><p className="font-bold">{s.title}</p><p className="text-sm text-[#6e6c68]">{s.description}</p></div>
-                </li>
-              ))}
-            </ol>
-            {rec.reason && <p className="mt-6 text-sm text-[#6e6c68]">추천 근거: {rec.reason}</p>}
-          </>}
+          {busy && <p className="py-20 text-center text-[#6e6c68]" role="status">청도군 시간표와 날씨를 보고 AI가 코스를 고르는 중… 최대 30초쯤 걸려요.</p>}
+          {!busy && !result && <p className="py-20 text-center text-[#6e6c68]">왼쪽에서 조건을 고르고 코스를 찾아보세요</p>}
+          {!busy && result && <CourseResult result={result} onRetry={submit} onChange={focusForm} onBus={() => go('bus')} retrying={busy} />}
         </Card>
       </div>
     </>
@@ -259,6 +247,8 @@ function BusPage() {
             </table>
             {!s.schedule.runs.length && <p className="py-6 text-center text-[#6e6c68]">운행편 없음</p>}
           </>}
+          <h2 className="mt-8 text-lg font-bold">코스 지도</h2>
+          <div className="mt-3"><TripMap pins={COURSE_PINS} route={courseRoute(visitsVillage(readRecommendation()?.recommendation.stops ?? []))} className="h-80" /></div>
         </Card>
         <Card>
           <h2 className="text-lg font-bold">이렇게 이동해요</h2>
@@ -276,26 +266,11 @@ function BusPage() {
 }
 
 function BenefitsPage({ go }: { go: Go }) {
-  const [cat, setCat] = useState('전체');
   return (
     <>
       <PageHead kicker="BENEFITS" title="여행 혜택" desc="디지털 관광주민증으로 받을 수 있는 혜택"
         action={<a href={BENEFITS_URL} target="_blank" rel="noreferrer"><Btn>관광주민증 혜택 확인하기 ↗</Btn></a>} />
-      <div className="mb-6 flex gap-2">
-        {['전체', '체험', '관람', '식음료'].map(c => <button key={c} onClick={() => setCat(c)} className={`h-10 rounded-full px-5 text-sm font-bold ${cat === c ? 'bg-[#7d3d00] text-white' : 'border border-[#e3dcd2] bg-white'}`}>{c}</button>)}
-      </div>
-      <div className="grid grid-cols-3 gap-6">
-        {BENEFITS.filter(b => cat === '전체' || b.cat === cat).map(b => (
-          <Card key={b.id}>
-            <p className="text-xs font-bold text-[#9e6b3f]">{b.cat} · 디지털 관광주민증</p>
-            <p className="mt-2 text-lg font-bold">{b.name}</p>
-            <p className="mt-1 text-xl font-bold text-[#7d3d00]">{b.deal}</p>
-            <p className="mt-3 text-sm text-[#6e6c68]">{b.how}</p>
-            {b.detail && <button onClick={() => go('benefitDetail')} className="mt-4 text-sm font-bold text-[#7d3d00]">사용 방법 보기 →</button>}
-          </Card>
-        ))}
-      </div>
-      <p className="mt-8 text-xs text-[#9c978f]">출처 대한민국 구석구석 · 디지털 관광주민증 · 혜택 조건은 방문 전 공식 페이지에서 확인하세요.</p>
+      <BenefitList grid onDetail={() => go('benefitDetail')} />
     </>
   );
 }
@@ -308,6 +283,8 @@ function BenefitDetailPage() {
       <div className="grid grid-cols-2 gap-8">
         <Card>
           <p className="text-3xl font-bold text-[#7d3d00]">탑승권 20% 할인</p>
+          <p className="mt-2 text-sm text-[#4c4945]"><b>적용 조건</b> · {BENEFITS[0].condition}</p>
+          <p className="mt-1 text-xs text-[#9c978f]">{checkedLabel(BENEFITS[0])}</p>
           <h2 className="mt-8 text-lg font-bold">이렇게 사용해요</h2>
           <ol className="mt-4 space-y-3 text-sm">
             {['디지털 관광주민증 쿠폰 발급', '현장 QR 스캔', '직원에게 쿠폰 확인', '할인 금액으로 결제'].map((t, i) => (
@@ -330,94 +307,71 @@ function BenefitDetailPage() {
   );
 }
 
-type Row = (typeof EXPENSES)[number];
-const CATS = ['숙박', '식비', '교통', '쇼핑', '기타'];
-
-function ExpensePage() {
-  // ponytail: no expense API on the backend yet — added rows live in this tab only
-  const [rows, setRows] = useState<Row[]>(EXPENSES);
-  const s = useMemo(() => settle(rows, PEOPLE), [rows]);
-  const all = rows.reduce((n, e) => n + e.amount, 0);
-  const [form, setForm] = useState({ name: '', amount: '', date: '2026-11-04', cat: '기타', payer: '나', shared: true });
-  const [ocr, setOcr] = useState('');
-  const onFile = async (f?: File) => {
-    if (!f) return;
-    setOcr('영수증을 읽는 중…');
-    try {
-      const img = await new Promise<string>((res, rej) => { const r = new FileReader(); r.onload = () => res(String(r.result)); r.onerror = rej; r.readAsDataURL(f); });
-      const r = await recognizeReceipt(img);
-      setForm(v => ({ ...v, name: r.merchant || v.name, amount: r.amount ? String(r.amount) : v.amount, date: r.date || v.date, cat: CATS.includes(r.category) ? r.category : v.cat }));
-      setOcr(r.status === 'recognized' ? '이미지에서 읽은 내용을 채웠어요. 저장 전에 확인해 주세요.' : '글자를 찾지 못했어요. 직접 입력해 주세요.');
-    } catch (e) { setOcr(`인식하지 못했어요 · ${(e as Error).message}`); }
-  };
-  const add = () => {
-    const amount = Number(form.amount.replace(/\D/g, ''));
-    if (!form.name.trim() || !amount) return setOcr('사용처와 금액을 입력해 주세요.');
-    const [, m, d] = form.date.split('-').map(Number);
-    setRows([{ name: form.name.trim(), amount, cat: form.cat, payer: form.payer, shared: form.shared, date: `${m}월 ${d}일` }, ...rows]);
-    setForm({ ...form, name: '', amount: '' }); setOcr('추가했어요.');
-  };
-  const input = 'mt-1 h-10 w-full rounded-lg border border-[#e3dcd2] px-3 text-sm font-normal';
+function ExpensePage({ go, editId, mode }: { go: Go; editId?: string; mode: ScreenId }) {
+  const { expenses, people } = useExpenses();
+  const s = useSettlement();
+  const formOpen = mode === 'expenseCapture' || mode === 'expenseEdit';
   return (
     <>
-      <PageHead kicker="EXPENSES" title="여행 경비" desc="청도 1박 2일 · 나와 민지" />
+      <PageHead kicker="EXPENSES" title="여행 경비" desc={`청도 여행 · ${people.join(' · ')}`}
+        action={<Btn onClick={() => go('expenseCapture')}>+ 경비 등록</Btn>} />
       <div className="grid grid-cols-3 gap-6">
-        <Card><p className="text-sm text-[#6e6c68]">총 지출</p><p className="mt-1 text-3xl font-bold">{won(all)}</p><p className="mt-1 text-sm text-[#6e6c68]">{rows.length}건</p></Card>
+        <Card><p className="text-sm text-[#6e6c68]">총 지출</p><p className="mt-1 text-3xl font-bold">{won(expenses.reduce((n, e) => n + e.amount, 0))}</p><p className="mt-1 text-sm text-[#6e6c68]">{expenses.length}건</p></Card>
         <Card><p className="text-sm text-[#6e6c68]">1인 정산 금액</p><p className="mt-1 text-3xl font-bold text-[#7d3d00]">{won(s.share)}</p><p className="mt-1 text-sm text-[#6e6c68]">정산 대상 {won(s.total)} · 개인 {won(s.personal)} 제외</p></Card>
-        <Card className="bg-[#f7f0e7]"><p className="text-sm text-[#6e6c68]">정산하려면</p><p className="mt-1 text-2xl font-bold">{s.transfer.from} → {s.transfer.to}</p><p className="mt-1 text-3xl font-bold text-[#7d3d00]">{won(s.transfer.amount)}</p></Card>
+        <Card className="bg-[#f7f0e7]"><p className="text-sm text-[#6e6c68]">정산하려면</p>
+          {s.transfers.length ? s.transfers.slice(0, 3).map((t, i) => <p key={i} className="mt-1 text-xl font-bold">{t.from} → {t.to} <span className="text-[#7d3d00]">{won(t.amount)}</span></p>)
+            : <p className="mt-1 text-xl font-bold">보낼 돈이 없어요</p>}
+        </Card>
       </div>
-      <div className="mt-6 grid grid-cols-[1fr_360px] gap-6">
+      <div className="mt-6 grid grid-cols-[1fr_380px] gap-6">
         <Card>
-          <h2 className="text-lg font-bold">전체 지출</h2>
-          <table className="mt-4 w-full text-sm">
-            <thead className="text-left text-[#6e6c68]"><tr className="border-b border-[#ece6dd]"><th className="py-2">날짜</th><th>사용처</th><th>항목</th><th>결제</th><th className="text-right">금액</th></tr></thead>
-            <tbody>{rows.map((e, i) => (
-              <tr key={i} className="border-b border-[#f3efe9]"><td className="py-3 text-[#6e6c68]">{e.date}</td><td className="font-bold">{e.name}</td><td>{e.cat}</td><td>{e.payer}{e.shared ? '' : ' · 개인'}</td><td className="text-right font-bold">{won(e.amount)}</td></tr>
-            ))}</tbody>
-          </table>
+          <h2 className="mb-4 text-lg font-bold">전체 지출 <span className="text-sm font-normal text-[#6e6c68]">행을 누르면 수정해요</span></h2>
+          <ExpenseList onEdit={id => go('expenseEdit', id)} />
+          <div className="mt-4"><StorageNote /></div>
         </Card>
         <div className="space-y-6">
-          <Card>
-            <h2 className="text-lg font-bold">항목별</h2>
-            <div className="mt-4 space-y-3">{CATS.map(c => { const v = rows.filter(e => e.cat === c).reduce((n, e) => n + e.amount, 0); return (
-              <div key={c}><div className="flex justify-between text-sm"><span>{c}</span><span className="font-bold">{won(v)}</span></div>
-                <div className="mt-1 h-1.5 rounded-full bg-[#f1ede7]"><div className="h-full rounded-full bg-[#7d3d00]" style={{ width: `${all ? (v / all) * 100 : 0}%` }} /></div></div>
-            ); })}</div>
-          </Card>
-          <Card>
-            <h2 className="text-lg font-bold">경비 추가</h2>
-            <label className="mt-4 flex h-20 cursor-pointer items-center justify-center rounded-xl border border-dashed border-[#d9c7b3] text-sm text-[#7d3d00] hover:bg-[#faf6f0]">
-              영수증·결제 캡처 올리기<input type="file" accept="image/*" className="hidden" onChange={e => onFile(e.target.files?.[0])} />
-            </label>
-            {ocr && <p className="mt-2 text-xs text-[#7d3d00]">{ocr}</p>}
-            <div className="mt-4 space-y-3 text-xs font-bold">
-              <label className="block">사용처<input className={input} value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} /></label>
-              <div className="grid grid-cols-2 gap-2">
-                <label>금액<input className={input} inputMode="numeric" value={form.amount} onChange={e => setForm({ ...form, amount: e.target.value })} /></label>
-                <label>사용일<input type="date" className={input} value={form.date} onChange={e => setForm({ ...form, date: e.target.value })} /></label>
-                <label>항목<select className={input} value={form.cat} onChange={e => setForm({ ...form, cat: e.target.value })}>{CATS.map(c => <option key={c}>{c}</option>)}</select></label>
-                <label>결제한 사람<select className={input} value={form.payer} onChange={e => setForm({ ...form, payer: e.target.value })}>{PEOPLE.map(p => <option key={p}>{p}</option>)}</select></label>
-              </div>
-              <label className="flex items-center gap-2 font-normal"><input type="checkbox" checked={form.shared} onChange={e => setForm({ ...form, shared: e.target.checked })} />함께 쓴 경비로 정산</label>
-            </div>
-            <div className="mt-4"><Btn onClick={add}>경비 추가</Btn></div>
-          </Card>
+          {formOpen && <Card>
+            <div className="mb-4 flex items-center justify-between"><h2 className="text-lg font-bold">{editId ? '경비 수정' : '경비 등록'}</h2>
+              <button className="text-sm text-[#6e6c68]" onClick={() => go('expense')} aria-label="닫기">닫기 ✕</button></div>
+            <ExpenseForm key={editId ?? 'new'} editId={editId} onDone={() => go('expense')} />
+          </Card>}
+          <Card><h2 className="mb-4 text-lg font-bold">항목별 · 일자별</h2><Breakdown expenses={expenses} /></Card>
+          <Card><h2 className="mb-4 text-lg font-bold">함께 정산</h2><SettlementPanel /></Card>
         </div>
       </div>
     </>
   );
 }
 
+function HeaderAccount({ go }: { go: Go }) {
+  const { user } = useAuth();
+  return user
+    ? <div className="ml-auto flex items-center gap-3 text-sm"><button onClick={() => go('login')} className="font-bold">{user.name}님</button>
+        <button onClick={() => auth.logout()} className="text-[#6e6c68] hover:text-[#24211d]">로그아웃</button></div>
+    : <div className="ml-auto flex items-center gap-2 text-sm"><button onClick={() => go('login')} className="rounded-lg px-3 py-2 font-bold text-[#6e6c68] hover:text-[#24211d]">로그인</button>
+        <button onClick={() => go('signup')} className="rounded-lg bg-[#7d3d00] px-4 py-2 font-bold text-white">회원가입</button></div>;
+}
+
+const AuthPage = ({ mode, go }: { mode: 'login' | 'signup'; go: Go }) => (
+  <div className="mx-auto max-w-md">
+    <PageHead kicker="ACCOUNT" title={mode === 'login' ? '로그인' : '회원가입'} desc="로그인하면 경비 기록을 계정별로 따로 관리할 수 있어요." />
+    <Card><AuthForm mode={mode} go={go} /></Card>
+  </div>
+);
+
 /* ---------- shell ---------- */
-export default function Site({ current, go }: { current: ScreenId; go: Go }) {
-  const [place, setPlace] = useState<Place | null>(null);
-  const openPlace = (p: Place) => { setPlace(p); go('placeDetail'); };
+export default function Site({ current, id, go }: { current: ScreenId; id?: string; go: Go }) {
+  const openPlace = (p: Place) => go('placeDetail', p.id);
   const page: Record<ScreenId, ReactNode> = {
     home: <HomePage go={go} openPlace={openPlace} />,
-    places: <PlacesPage openPlace={openPlace} />, placeDetail: <PlaceDetailPage place={place} go={go} />,
-    myInput: <CoursePage />, myResult: <CoursePage />, bus: <BusPage />,
+    map: <MapView go={go} desktop onOpenPlace={openPlace} />,
+    login: <AuthPage mode="login" go={go} />, signup: <AuthPage mode="signup" go={go} />,
+    places: <PlacesPage openPlace={openPlace} />, placeDetail: <PlaceInfo id={id} go={go} wide />,
+    myInput: <CoursePage go={go} />, myResult: <CoursePage go={go} />, bus: <BusPage />,
     benefits: <BenefitsPage go={go} />, benefitDetail: <BenefitDetailPage />,
-    expense: <ExpensePage />, expenseAll: <ExpensePage />, expenseCapture: <ExpensePage />, expenseSettle: <ExpensePage />,
+    expense: <ExpensePage go={go} mode="expense" />, expenseAll: <ExpensePage go={go} mode="expenseAll" />,
+    expenseCapture: <ExpensePage go={go} mode="expenseCapture" />, expenseEdit: <ExpensePage go={go} mode="expenseEdit" editId={id} />,
+    expenseSettle: <ExpensePage go={go} mode="expenseSettle" />,
   };
   return (
     <div className="min-h-screen bg-[#faf8f5] text-[#24211d]">
@@ -433,6 +387,7 @@ export default function Site({ current, go }: { current: ScreenId; go: Go }) {
                 className={`rounded-lg px-4 py-2 text-sm font-bold ${group.includes(current) ? 'bg-[#f7f0e7] text-[#7d3d00]' : 'text-[#6e6c68] hover:text-[#24211d]'}`}>{label}</button>
             ))}
           </nav>
+          <HeaderAccount go={go} />
         </div>
       </header>
       <main className="mx-auto max-w-6xl px-8 py-10">{page[current]}</main>

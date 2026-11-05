@@ -1,3 +1,4 @@
+import { useAuth } from './auth';
 // Figma absolute-layer helpers shared by every 396×876 screen.
 const assetPathPrefix = "/assets/3420a488-413a-4bef-a126-be092c981cb8";
 const a = (f: string) => `${assetPathPrefix}/${f}`;
@@ -55,3 +56,35 @@ export const BottomNav = ({ active, activeIcon }: { active: Tab; activeIcon?: st
     })}
   </div>
 );
+
+/** Floating "지도" pill for the mobile Figma screens; App routes data-name="지도 열기" to the map. */
+export const MapFab = ({ c }: { c: string }) => (
+  <button data-name="지도 열기" aria-label="지도에서 보기"
+    className={`absolute z-10 flex items-center gap-1 rounded-full bg-white px-3 py-1.5 text-[12px] font-bold text-[#7d3d00] shadow-[0_2px_8px_rgba(36,33,29,0.18)] ${c}`}>
+    ◎ 지도
+  </button>
+);
+
+/** Mobile screen with the Figma header and a normal scrolling body (for data-driven screens). */
+export const FlowPage = ({ title, sub, right, tab = 'expenses', children }: { title: string; sub?: string; right?: React.ReactNode; tab?: Tab; children: React.ReactNode }) => (
+  <div className="relative size-full">
+    <Bg />
+    <Header title={title} right={right ?? <AccountPill className="right-[5.05%] top-[1.8%]" />} />
+    <div className="absolute inset-x-0 bottom-0 top-[7.6%] overflow-y-auto px-[5.05%] pb-24 pt-4 font-['Noto_Sans_KR'] text-[#24211d]">
+      {sub && <p className="mb-4 text-[12px] text-[#6e6c68]">{sub}</p>}
+      {children}
+    </div>
+    <BottomNav active={tab} />
+  </div>
+);
+
+/** Small top-right pill: "로그인" or the user's name (opens the account page). */
+export function AccountPill({ className = '' }: { className?: string }) {
+  const { user } = useAuth();
+  return (
+    <button data-name="계정 열기" aria-label={user ? `${user.name} 계정` : '로그인'}
+      className={`absolute z-10 rounded-full bg-white px-3 py-1.5 text-[12px] font-bold text-[#7d3d00] shadow-[0_2px_8px_rgba(36,33,29,0.18)] ${className}`}>
+      {user ? `${user.name}님` : '로그인'}
+    </button>
+  );
+}

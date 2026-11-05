@@ -1,3 +1,5 @@
+import { visitsVillage } from '../map';
+import { MapFab } from '../ui';
 import { useEffect, useState } from 'react';
 import { fallbackRecommendation, getBusSchedule, readRecommendation, type BusSchedule } from '../api';
 
@@ -68,7 +70,8 @@ export default function Bus() {
   }, []);
   const stops = recommendation.stops;
   const placeStops = stops.filter((stop) => stop.kind === 'place');
-  const hasVillage = placeStops.some((stop) => stop.title.includes('송금마을'));
+  // no saved recommendation → show the full course; wine-tunnel-only course hides the village leg
+  const hasVillage = visitsVillage(stops);
   const routeSummary = placeStops.length
     ? `청도역 → ${placeStops.map((stop) => stop.title.replace(/ 둘러보기| 산책$/, '')).join(' → ')}`
     : '서버 추천 동선의 이동 안내';
@@ -132,7 +135,8 @@ export default function Bus() {
         <p className={`${B} inset-[45.32%_13.01%_53.2%_76.64%] text-[#24211d] text-[11px] text-center`}>송금마을</p>
       </>}
       <I c="inset-[22.83%_78.28%_74.32%_7.83%]" s={imgDiagramLabelGround} />
-      <p className={`${B} bottom-3/4 left-[10.73%] right-[81.44%] top-[23.52%] text-[#6e6c68] text-[11px] text-center`}>개략도</p>
+      <p className={`${B} bottom-3/4 left-[10.73%] right-[81.44%] top-[23.52%] text-[#6e6c68] text-[11px] text-center`}>개략 동선</p>
+      <p className={`${R} inset-[23.6%_auto_75%_20.5%] text-[#9c978f] text-[10px]`}>실제 길 안내 아님 · 현장에서 확인</p>
       <I c="inset-[22.83%_7.83%_74.32%_67.68%]" s={imgBusBadgeGround} />
       <I c="inset-[23.86%_27.78%_75.46%_70.71%]" s={imgCourseBusDot} />
       <p className={`${B} bottom-3/4 left-[74.75%] right-[15.15%] top-[23.52%] text-[#7d3d00] text-[11px]`}>7번 버스</p>
@@ -203,6 +207,7 @@ export default function Bus() {
         <p className={`${B} inset-[96%_9.97%_2.51%_84.72%] text-[#6e6c68] text-[11px] text-center`}>장소</p>
       </a>
       </div>
+      <MapFab c="right-[5.05%] top-[1.8%]" />
     </div>
   );
 }

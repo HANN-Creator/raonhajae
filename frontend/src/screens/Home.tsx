@@ -1,3 +1,5 @@
+import { useEffect, useState } from 'react'
+import { getBusSchedule, type BusSchedule } from '../api'
 import type { ScreenProps } from '../nav'
 
 const assetPathPrefix = "/assets/63074331-c5ab-4c65-8481-c6e91566771a";
@@ -32,6 +34,11 @@ const imgBenefitsTabIcon = `${assetPathPrefix}/5650c.svg`;
 const imgPlacesTabIcon = `${assetPathPrefix}/7f589.svg`;
 
 export default function Home({ go }: ScreenProps) {
+  const [bus, setBus] = useState<{ schedule: BusSchedule | null; error?: string } | null>(null)
+  useEffect(() => { let on = true; getBusSchedule().then(r => on && setBus(r)); return () => { on = false } }, [])
+  const busLine = !bus ? '버스 시간표 확인 중…'
+    : bus.schedule ? `${bus.schedule.status === 'live' ? '청도군 게시 시간표' : '저장된 시간표'} · ${bus.schedule.runs.map(r => r.depart).join(' · ') || '운행편 없음'} 출발 · 실시간 아님`
+    : '시간표를 불러오지 못했어요 · 원문에서 확인'
   return (
     <div className="relative size-full">
       <img alt="" className="absolute block inset-0 max-w-none size-full" src={img} />
@@ -97,6 +104,7 @@ export default function Home({ go }: ScreenProps) {
         <p className="absolute font-['Noto_Sans_KR:Bold'] font-bold inset-[69.06%_17.17%_29%_65.66%] leading-[normal] text-[14px] text-white whitespace-nowrap">청도읍 풍경</p>
       </a>
       <p className="absolute font-['Noto_Sans_KR:Bold'] font-bold leading-[normal] whitespace-nowrap inset-[75.23%_66.67%_22.6%_5.3%] text-[#24211d] text-[16px]">오늘의 추천 동선</p>
+      <p role="status" className="absolute font-['Noto_Sans_KR:Regular'] font-normal leading-[normal] whitespace-nowrap inset-[77.7%_auto_20.9%_5.3%] text-[#77736e] text-[10px]">{busLine}</p>
       <a onClick={() => go('bus')} className="absolute font-['Noto_Sans_KR:Bold'] font-bold leading-[normal] whitespace-nowrap inset-[75.68%_5.56%_22.83%_80.05%] text-[#6e6c68] text-[11px] text-right">코스 보기 ↗</a>
       <a onClick={() => go('bus')} className="absolute contents">
         <div className="absolute inset-[78.6%_5.18%_10.56%_5.18%]"><div className="absolute inset-[-0.53%_-0.14%]"><img alt="" className="block max-w-none size-full" src={imgRouteCardSurface} /></div></div>

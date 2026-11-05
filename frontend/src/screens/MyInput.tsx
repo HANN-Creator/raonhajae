@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { createRecommendation, saveRecommendation } from '../api';
+import { createRecommendation, saveRecommendation, tripDateRange, validateTrip } from '../api';
 import type { ScreenProps } from '../nav';
 import { B, Bg, BottomNav, Header, I, R, StatusBar } from '../ui';
 
@@ -35,12 +35,14 @@ export default function MyInput({ go }: ScreenProps) {
   const [slow, setSlow] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [custom, setCustom] = useState('');
+  const range = tripDateRange();
   const dates = Array.from({ length: 5 }, (_, index) => {
     const date = new Date();
     date.setDate(date.getDate() + index + 2);
     return date;
   });
-  const selectedDate = dates[day];
+  const selectedDate = custom ? new Date(`${custom}T00:00:00`) : dates[day];
   const pad = (value: number) => String(value).padStart(2, '0');
   const visitDate = `${selectedDate.getFullYear()}-${pad(selectedDate.getMonth() + 1)}-${pad(selectedDate.getDate())}`;
   const weekdays = ['일', '월', '화', '수', '목', '금', '토'];
@@ -52,6 +54,8 @@ export default function MyInput({ go }: ScreenProps) {
     setLoading(true);
     setError('');
     const request = { visitDate, arrivalTime: time, pace: slow ? 'slow' as const : 'easy' as const };
+    const invalid = validateTrip(request);
+    if (invalid) { setError(invalid); setLoading(false); return; }
     try {
       const { recommendation, usingFallback, error: apiError } = await createRecommendation(request);
       saveRecommendation(recommendation, request, usingFallback, apiError);
@@ -73,12 +77,16 @@ export default function MyInput({ go }: ScreenProps) {
       <I c="inset-[25.9%_85.83%_72.14%_9.82%]" s={imgCalendarIcon} pad="inset-[-6.14%]" />
       <p className={`${B} inset-[26.03%_44.7%_72.03%_18.69%] text-[#24211d] text-[14px]`}>{selectedDate.getFullYear()}년 {selectedDate.getMonth() + 1}월 {selectedDate.getDate()}일 {weekdays[selectedDate.getDay()]}요일</p>
       <I c="inset-[26.26%_9.34%_72.37%_89.14%]" s={imgDateChevron} pad="inset-[-7.5%_-15%]" />
+      {/* native picker over the date field: any day within 1 year (KST) */}
+      <input type="date" aria-label="여행 날짜 직접 선택" min={range.min} max={range.max} value={visitDate}
+        onChange={e => { if (e.target.value) { setCustom(e.target.value); setError(''); } }}
+        className="absolute inset-[23.74%_5.05%_69.98%_5.05%] cursor-pointer opacity-0" />
       <p className={`${B} inset-[32.19%_80.3%_66.21%_5.05%] text-[#6e6c68] text-[12px]`}>가까운 날짜</p>
       {CHIP_LAYOUTS.map(([box, wd, num], i) => (
-        <button key={i} className="absolute contents cursor-pointer" onClick={() => setDay(i)}>
-          <I c={box} s={i === day ? imgSaturdayChipSelected : imgSundayChip} pad={i === day ? 'inset-[-1.03%_-0.94%]' : 'inset-[-0.86%_-0.78%]'} />
-          <p className={`${i === day ? B : R} ${wd} ${i === day ? 'text-[#7d3d00]' : 'text-[#6e6c68]'} text-[11px] text-center`}>{weekdays[dates[i].getDay()]}</p>
-          <p className={`${B} ${num} ${i === day ? 'text-[#7d3d00]' : 'text-[#24211d]'} text-[19px] text-center`}>{dates[i].getDate()}</p>
+        <button key={i} className="absolute contents cursor-pointer" onClick={() => { setDay(i); setCustom(''); }} aria-pressed={!custom && day === i}>
+          <I c={box} s={(!custom && i === day) ? imgSaturdayChipSelected : imgSundayChip} pad={(!custom && i === day) ? 'inset-[-1.03%_-0.94%]' : 'inset-[-0.86%_-0.78%]'} />
+          <p className={`${(!custom && i === day) ? B : R} ${wd} ${(!custom && i === day) ? 'text-[#7d3d00]' : 'text-[#6e6c68]'} text-[11px] text-center`}>{weekdays[dates[i].getDay()]}</p>
+          <p className={`${B} ${num} ${(!custom && i === day) ? 'text-[#7d3d00]' : 'text-[#24211d]'} text-[19px] text-center`}>{dates[i].getDate()}</p>
         </button>
       ))}
       <p className={`${B} inset-[44.41%_75.25%_53.77%_5.05%] text-[#24211d] text-[13px]`}>청도 도착 시각</p>
@@ -116,7 +124,7 @@ export default function MyInput({ go }: ScreenProps) {
       <button className="absolute contents cursor-pointer disabled:cursor-wait" onClick={findCourse} disabled={loading}>
         <I c="inset-[84.59%_5.05%_9.93%_5.05%]" s={imgFindCourseButton} />
         <p className={`${B} inset-[86.42%_32.07%_11.64%_32.07%] text-[14px] text-center text-white`}>
-          {loading ? '코스를 찾고 있어요…' : '내 시간에 맞는 코스 보기'}
+          {loading ? 'AI가 코스를 고르는 중…' : '내 시간에 맞는 코스 보기'}
         </p>
       </button>
       <BottomNav active="myRoute" />

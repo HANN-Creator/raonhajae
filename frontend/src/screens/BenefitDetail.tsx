@@ -1,3 +1,4 @@
+import { BENEFITS, checkedLabel } from '../benefits';
 import { B, Bg, BottomNav, Header, I, R, StatusBar } from '../ui';
 
 const assetPathPrefix = "/assets/9363a106-9969-43b9-ac73-e885ea5b6285";
@@ -47,7 +48,7 @@ export default function BenefitDetail() {
       <p className={`${B} inset-[68.61%_9.6%_29.91%_73.74%] text-[#24211d] text-[11px] text-right`}>09:00–18:00</p>
       <p className={`${R} inset-[71.69%_85.61%_26.83%_9.09%] text-[#6e6c68] text-[11px]`}>문의</p>
       <a href="tel:054-373-2426" className={`${B} inset-[71.69%_9.6%_26.83%_71.72%] text-[#24211d] text-[11px] text-right`}>054-373-2426</a>
-      <p className={`${R} inset-[78.77%_38.38%_19.75%_5.05%] text-[#6e6c68] text-[11px]`}>최신 운영·할인 조건은 공식 페이지에서 다시 확인</p>
+      <p className={`${R} inset-[78.77%_38.38%_19.75%_5.05%] text-[#6e6c68] text-[11px]`}>{checkedLabel(BENEFITS[0])} · 최신 조건은 공식 페이지에서 확인</p>
       <a className="absolute contents cursor-pointer" href="https://korean.visitkorea.or.kr/dgtourcard/biz/mbrb/mbrbPtcl.do?mbrbId=51c5ee50-3def-4e99-a318-d8f668d385ff" target="_blank" rel="noreferrer">
         <I c="inset-[82.65%_5.05%_11.87%_5.05%]" s={imgButton} />
         <p className={`${B} inset-[84.47%_34.09%_13.58%_34.09%] text-[14px] text-center text-white`}>공식 혜택 페이지 열기</p>

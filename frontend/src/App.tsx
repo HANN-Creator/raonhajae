@@ -1,5 +1,5 @@
 import { useEffect, useState, type MouseEvent } from 'react';
-import type { ScreenId } from './nav';
+import { PARENT, parseHash, toHash, type Entry, type Go, type ScreenId } from './nav';
 import Home from './screens/Home';
 import Expense from './screens/Expense';
 import Bus from './screens/Bus';
@@ -13,6 +13,9 @@ import ExpenseAll from './screens/ExpenseAll';
 import ExpenseCapture from './screens/ExpenseCapture';
 import ExpenseSettle from './screens/ExpenseSettle';
 import Site from './web/Site';
+import MapView from './screens/MapView';
+import { LoginScreen, SignupScreen } from './screens/Account';
+import { AccountPill } from './ui';
 
 // Matches the 760px breakpoint in index.css: wider = website, narrower = mobile app.
 const desktopQuery = window.matchMedia('(min-width: 761px)');
@@ -33,8 +36,12 @@ const SCREEN_META: Record<ScreenId, { title: string }> = {
   bus: { title: '버스 이동 정보' },
   expense: { title: '여행 경비' },
   expenseAll: { title: '전체 지출' },
-  expenseCapture: { title: '영수증 인식' },
+  expenseCapture: { title: '경비 등록' },
+  expenseEdit: { title: '경비 수정' },
   expenseSettle: { title: '함께 정산' },
+  map: { title: '청도 지도' },
+  login: { title: '로그인' },
+  signup: { title: '회원가입' },
 };
 
 const NAV_ITEMS: { label: string; target: ScreenId; icon: string }[] = [
@@ -47,11 +54,11 @@ const NAV_ITEMS: { label: string; target: ScreenId; icon: string }[] = [
 ];
 
 const MOBILE_NAV_ITEMS: { label: string; target: ScreenId; icon: string; screens: ScreenId[] }[] = [
-  { label: '홈', target: 'home', icon: '⌂', screens: ['home'] },
+  { label: '홈', target: 'home', icon: '⌂', screens: ['home', 'bus'] },
   { label: '내 코스', target: 'myInput', icon: '↗', screens: ['myInput', 'myResult'] },
-  { label: '경비', target: 'expense', icon: '₩', screens: ['expense', 'expenseAll', 'expenseCapture', 'expenseSettle'] },
+  { label: '경비', target: 'expense', icon: '₩', screens: ['expense', 'expenseAll', 'expenseCapture', 'expenseEdit', 'expenseSettle'] },
   { label: '혜택', target: 'benefits', icon: '✳', screens: ['benefits', 'benefitDetail'] },
-  { label: '장소', target: 'places', icon: '⌕', screens: ['places', 'placeDetail'] },
+  { label: '장소', target: 'places', icon: '⌕', screens: ['places', 'placeDetail', 'map'] },
 ];
 
 const LINK_TARGETS: Record<string, ScreenId | 'back'> = {
@@ -64,49 +71,42 @@ const LINK_TARGETS: Record<string, ScreenId | 'back'> = {
   '추천 코스 보기': 'myResult',
   '버스 코스 자세히 보기': 'bus',
   '레일바이크 상세': 'benefitDetail',
-  '와인터널 상세': 'placeDetail',
+  '와인터널 상세': 'placeDetail',  // Figma links without an id open the first place
   '전체 지출 열기': 'expenseAll',
   '07 Settlement preview': 'expenseSettle',
   '08 Receipt upload actions': 'expenseCapture',
+  '지도 열기': 'map',
+  '계정 열기': 'login',
 };
 
-const screenFromHash = (hash: string): ScreenId =>
-  Object.hasOwn(SCREEN_META, hash.replace(/^#\/?/, ''))
-    ? hash.replace(/^#\/?/, '') as ScreenId
-    : 'home';
-
 export default function App() {
-  const [stack, setStack] = useState<ScreenId[]>(() => [screenFromHash(window.location.hash)]);
-  const current = stack[stack.length - 1] ?? 'home';
+  const [stack, setStack] = useState<Entry[]>(() => [parseHash(window.location.hash)]);
+  const top = stack[stack.length - 1] ?? { screen: 'home' as ScreenId };
+  const current = top.screen;
 
   useEffect(() => {
-    if (!window.history.state?.screen) {
-      window.history.replaceState({ screen: current, stack }, '', `#${current}`);
-    }
+    if (!Array.isArray(window.history.state?.stack)) window.history.replaceState({ stack }, '', toHash(top));
     const handlePopState = (event: PopStateEvent) => {
-      if (Array.isArray(event.state?.stack) && event.state.stack.every((entry: unknown) => typeof entry === 'string')) {
-        setStack(event.state.stack as ScreenId[]);
-      } else {
-        setStack([screenFromHash(window.location.hash)]);
-      }
+      const st = event.state?.stack;
+      setStack(Array.isArray(st) && st.every((e: unknown) => typeof e === 'object' && e && 'screen' in e) ? st as Entry[] : [parseHash(window.location.hash)]);
     };
     window.addEventListener('popstate', handlePopState);
     return () => window.removeEventListener('popstate', handlePopState);
   }, []);
 
-  const go = (target: ScreenId | 'back') => {
+  const go: Go = (target, id) => {
     if (target === 'back') {
-      if (stack.length > 1) window.history.back();
-      else if (current !== 'home') {
-        const nextStack: ScreenId[] = ['home'];
-        setStack(nextStack);
-        window.history.pushState({ screen: 'home', stack: nextStack }, '', '#home');
-      }
+      if (stack.length > 1) return window.history.back();
+      // opened directly: go up to the parent list instead of leaving the app
+      const up: Entry = { screen: PARENT[current] ?? 'home' };
+      if (current === 'home') return;
+      setStack([up]);
+      window.history.replaceState({ stack: [up] }, '', toHash(up));
       return;
     }
-    const nextStack: ScreenId[] = [...stack, target];
-    setStack(nextStack);
-    window.history.pushState({ screen: target, stack: nextStack }, '', `#${target}`);
+    const next: Entry[] = [...stack, id ? { screen: target, id } : { screen: target }];
+    setStack(next);
+    window.history.pushState({ stack: next }, '', toHash(next[next.length - 1]));
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
@@ -117,22 +117,26 @@ export default function App() {
   };
 
   const screens: Record<ScreenId, React.ReactNode> = {
-    home: <Home go={go} />,
-    expense: <Expense />,
+    home: <><Home go={go} /><AccountPill className="right-[5.05%] top-[1.2%]" /></>,
+    expense: <Expense go={go} />,
     bus: <Bus />,
     myInput: <MyInput go={go} />,
-    myResult: <MyResult />,
-    benefits: <Benefits />,
+    myResult: <MyResult go={go} />,
+    benefits: <Benefits go={go} />,
     benefitDetail: <BenefitDetail />,
-    places: <Places />,
-    placeDetail: <PlaceDetail />,
-    expenseAll: <ExpenseAll />,
-    expenseCapture: <ExpenseCapture />,
-    expenseSettle: <ExpenseSettle />,
+    places: <Places go={go} />,
+    placeDetail: <PlaceDetail go={go} id={top.id} />,
+    expenseAll: <ExpenseAll go={go} />,
+    expenseCapture: <ExpenseCapture key="new" go={go} />,
+    expenseEdit: <ExpenseCapture key={top.id} go={go} editId={top.id} />,
+    expenseSettle: <ExpenseSettle go={go} />,
+    map: <MapView go={go} />,
+    login: <LoginScreen go={go} />,
+    signup: <SignupScreen go={go} />,
   };
   const { title } = SCREEN_META[current];
   const desktop = useDesktop();
-  if (desktop) return <Site current={current} go={go} />;
+  if (desktop) return <Site current={current} id={top.id} go={go} />;
 
   return (
     <div className="web-app" onClick={onClick}>

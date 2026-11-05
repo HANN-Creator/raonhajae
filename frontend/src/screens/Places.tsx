@@ -1,10 +1,15 @@
 import { useEffect, useMemo, useState } from 'react'
 import { fallbackPlaces, getPlaces, type Place } from '../api'
-import { B, Bg, BottomNav, Header, R, StatusBar } from '../ui'
+import type { ScreenProps } from '../nav'
+import { B, Bg, BottomNav, Header, R, StatusBar, MapFab } from '../ui'
 
 const FILTERS = ['전체', '체험', '볼거리', '산책'] as const
+// R/B are built for absolute Figma layers; this list is normal flow, so drop absolute + nowrap.
+const flow = (c: string) => c.replace('absolute ', '').replace(' whitespace-nowrap', '')
+const FR = flow(R)
+const FB = flow(B)
 
-export default function Places() {
+export default function Places({ go }: ScreenProps) {
   const [filter, setFilter] = useState<(typeof FILTERS)[number]>('전체')
   const [query, setQuery] = useState('')
   const [places, setPlaces] = useState<Place[]>(fallbackPlaces)
@@ -49,7 +54,7 @@ export default function Places() {
             onChange={(event) => setQuery(event.target.value)}
             placeholder="장소 이름이나 지역 검색"
             aria-label="장소 검색"
-            className={`${R} w-full bg-transparent text-[13px] text-[#24211d] outline-none placeholder:text-[#8b8985]`}
+            className={`${FR} w-full bg-transparent text-[13px] text-[#24211d] outline-none placeholder:text-[#8b8985]`}
           />
         </label>
 
@@ -70,7 +75,7 @@ export default function Places() {
           ))}
         </div>
 
-        <p className={`${R} mt-3 text-[10px] text-[#77736e]`} role="status" aria-live="polite">
+        <p className={`${FR} mt-3 text-[10px] text-[#77736e]`} role="status" aria-live="polite">
           {loading
             ? '청도 장소를 불러오는 중…'
             : usingFallback
@@ -83,14 +88,13 @@ export default function Places() {
             <article key={place.id} className="overflow-hidden rounded-[12px] border border-[#e6e1da] bg-white">
               <button
                 className="block w-full text-left"
-                data-name={place.id === 'rail-bike' ? '레일바이크 상세' : '와인터널 상세'}
+                onClick={() => go('placeDetail', place.id)}
                 aria-label={`${place.name} 상세 정보 보기`}
               >
                 <img
                   src={place.imageUrl}
                   alt=""
                   className="h-[150px] w-full object-cover"
-                  loading="lazy"
                   onError={(event) => {
                     event.currentTarget.src = fallbackPlaces[0].imageUrl
                   }}
@@ -98,10 +102,10 @@ export default function Places() {
                 <div className="p-4">
                   <div className="flex items-center justify-between">
                     <span className="rounded-full bg-[#f7f1e8] px-2.5 py-1 text-[10px] text-[#7d3d00]">{place.category}</span>
-                    <span className={`${R} text-[10px] text-[#77736e]`}>{place.area}</span>
+                    <span className={`${FR} text-[10px] text-[#77736e]`}>{place.area}</span>
                   </div>
-                  <h2 className={`${B} static mt-2 text-[16px] text-[#24211d]`}>{place.name}</h2>
-                  <p className={`${R} mt-1 text-[11px] leading-5 text-[#6e6c68]`}>{place.description}</p>
+                  <h2 className={`${FB} mt-2 text-[16px] text-[#24211d]`}>{place.name}</h2>
+                  <p className={`${FR} mt-1 text-[11px] leading-5 text-[#6e6c68]`}>{place.description}</p>
                   <div className="mt-2 flex flex-wrap gap-1.5">
                     {place.tags.map((tag) => (
                       <span key={tag} className="rounded bg-[#f5f3ef] px-2 py-1 text-[9px] text-[#77736e]"># {tag}</span>
@@ -113,14 +117,15 @@ export default function Places() {
           ))}
           {!visiblePlaces.length && (
             <div className="rounded-[12px] bg-white px-4 py-10 text-center">
-              <p className={`${B} static text-[14px] text-[#24211d]`}>조건에 맞는 장소가 없어요</p>
-              <p className={`${R} mt-2 text-[11px] text-[#6e6c68]`}>검색어를 바꾸거나 다른 종류를 선택해보세요.</p>
+              <p className={`${FB} text-[14px] text-[#24211d]`}>조건에 맞는 장소가 없어요</p>
+              <p className={`${FR} mt-2 text-[11px] text-[#6e6c68]`}>'와인터널', '레일바이크', '화양읍'처럼 장소 이름이나 지역으로 검색하거나 다른 종류를 골라 보세요.</p>
             </div>
           )}
         </div>
-        <p className={`${R} mt-4 text-center text-[10px] text-[#77736e]`}>운영시간과 혜택은 방문 전 공식 안내에서 확인하세요.</p>
+        <p className={`${FR} mt-4 text-center text-[10px] text-[#77736e]`}>운영시간과 혜택은 방문 전 공식 안내에서 확인하세요.</p>
       </div>
       <BottomNav active="places" />
+      <MapFab c="right-[5.05%] top-[1.8%]" />
     </div>
   )
 }
